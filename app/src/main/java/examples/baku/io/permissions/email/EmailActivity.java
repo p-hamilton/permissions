@@ -1,5 +1,6 @@
-package examples.baku.io.permissions;
+package examples.baku.io.permissions.email;
 
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -7,7 +8,6 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
@@ -20,7 +20,9 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseException;
@@ -31,6 +33,10 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
+
+import examples.baku.io.permissions.PermissionService;
+import examples.baku.io.permissions.R;
 
 public class EmailActivity extends AppCompatActivity implements ServiceConnection{
 
@@ -45,7 +51,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     private DatabaseReference mMessagesRef;
 
     private RecyclerView mInboxRecyclerView;
-    private mMessagesAdapter mInboxAdapter;
+    private MessagesAdapter mInboxAdapter;
     private LinearLayoutManager mLayoutManager;
 
     private LinkedHashMap<String, MessageData> mMessages = new LinkedHashMap<>();
@@ -73,7 +79,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
 
         bindService(new Intent(this, PermissionService.class), this, Service.BIND_AUTO_CREATE);
 
-        mInboxAdapter = new mMessagesAdapter(mMessages);
+        mInboxAdapter = new MessagesAdapter(mMessages);
         mLayoutManager = new LinearLayoutManager(this);
         mInboxRecyclerView = (RecyclerView) findViewById(R.id.inboxRecyclerView);
         mInboxRecyclerView.setLayoutManager(mLayoutManager);
@@ -100,14 +106,15 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_cast) {
+
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    ItemTouchHelper.SimpleCallback simpleItemTouchCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+    ItemTouchHelper.SimpleCallback simpleItemTouchCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT) {
         @Override
         public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
             return false;
@@ -116,7 +123,13 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         @Override
         public void onSwiped(RecyclerView.ViewHolder viewHolder, int swipeDir) {
             //Remove swiped item from list and notify the RecyclerView
+            int pos = viewHolder.getAdapterPosition();
+            MessageData item = mInboxAdapter.getItem(pos);
+            if(item != null){
+                mMessagesRef.child(item.getId()).removeValue();
+            }
         }
+
 
 
     };
@@ -127,12 +140,41 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         mPermissionService = binder.getInstance();
         if(mPermissionService != null){
             mFirebaseDB = mPermissionService.getFirebaseDB();
-            mMessagesRef = mFirebaseDB.getReference("emails");
+            mMessagesRef = mFirebaseDB.getReference("emails").child("messages");
             mMessagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
                     onMessagesUpdated(dataSnapshot);
                     mInboxAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
+            });
+            mMessagesRef.addChildEventListener(new ChildEventListener() {
+                @Override
+                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                    onMessageUpdated(dataSnapshot);
+                    mInboxAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+                    onMessageUpdated(dataSnapshot);
+                    mInboxAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onChildRemoved(DataSnapshot dataSnapshot) {
+                    onMessageRemoved(dataSnapshot.getKey());
+                    mInboxAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
                 }
 
                 @Override
@@ -154,7 +196,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         mMessages.clear();
         for (Iterator<DataSnapshot> iterator = snapshot.getChildren().iterator(); iterator.hasNext(); ) {
             DataSnapshot snap =  iterator.next();
-            onMessageUpdated(snapshot);
+            onMessageUpdated(snap);
         }
     }
 
@@ -166,7 +208,12 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             mMessages.put(msg.getId(), msg);
         }catch (DatabaseException e){
             e.printStackTrace();
-            mMessages.put(snapshot.getKey(), null);
+        }
+    }
+
+    void onMessageRemoved(String id){
+        if(mMessages.containsKey(id)){
+            mMessages.remove(id);
         }
     }
 
@@ -175,14 +222,31 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         public ViewHolder(CardView v) {
             super(v);
             mCardView = v;
+
+            mCardView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+
+                }
+            });
         }
     }
-    public class mMessagesAdapter extends RecyclerView.Adapter<ViewHolder> {
+
+    public class MessagesAdapter extends RecyclerView.Adapter<ViewHolder> {
         private LinkedHashMap<String, MessageData> mDataset;
 
-        public mMessagesAdapter(LinkedHashMap<String, MessageData> dataset) {
+        public MessagesAdapter(LinkedHashMap<String, MessageData> dataset) {
             if(dataset == null) throw new IllegalArgumentException("null dataset");
-            mDataset = dataset;
+            setDataset(dataset);
+        }
+
+        public void setDataset(LinkedHashMap<String, MessageData> mDataset) {
+            this.mDataset = mDataset;
+        }
+
+        public MessageData getItem(int position){
+            List<String> order = new ArrayList<>(mDataset.keySet());
+            return mDataset.get(order.get(position));
         }
 
         @Override
@@ -202,11 +266,30 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             // - replace the contents of the view with that element
 //            holder.mCardView.setText(mDataset[position]);
 
+            final MessageData item = getItem(position);
+
+            String title = item.getFrom();
+            if(title != null){
+                TextView titleView = (TextView)holder.mCardView.findViewById(R.id.card_title);
+                titleView.setText(item.getFrom());
+                TextView subtitleView= (TextView)holder.mCardView.findViewById(R.id.card_subtitle);
+                subtitleView.setText(item.getSubject());
+            }
+
+            holder.mCardView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(EmailActivity.this, ComposeActivity.class);
+                    intent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, item.getId());
+                    startActivityForResult(intent, 0);
+                }
+            });
+
         }
 
         @Override
         public int getItemCount() {
-            return mDataset.size();//mDataset.length;
+            return mDataset.size();
         }
     }
 

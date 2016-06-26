@@ -6,3 +6,14 @@
 .DS_Store
 /build
 /captures
+
+# google-services / firebase configuration
+google-services.json
+
+# OSX files
+.DS_Store
+# Windows thumbnail db
+Thumbs.db
+
+#NDK
+obj/

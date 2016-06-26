@@ -94,4 +94,6 @@
     <string name="title_message_list">Messages</string>
     <string name="title_message_detail">Message Detail</string>
     <string name="title_activity_compose">ComposeActivity</string>
+    <string name="title_activity_discovery">Discovery</string>
+    <string name="section_format">Hello World from section: %1$d</string>
 </resources>

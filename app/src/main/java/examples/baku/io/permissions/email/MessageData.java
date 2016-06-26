@@ -1,4 +1,4 @@
-package examples.baku.io.permissions;
+package examples.baku.io.permissions.email;
 
 /**
  * Created by phamilton on 6/22/16.
@@ -6,10 +6,10 @@ package examples.baku.io.permissions;
 public class MessageData {
 
     String id;
-    String to;
-    String from;
-    String subject;
-    String message;
+    String to = "";
+    String from = "";
+    String subject = "";
+    String message = "";
 
     public MessageData(){}
 
@@ -34,7 +34,7 @@ public class MessageData {
     }
 
     public void setTo(String to) {
-        this.to = to;
+        this.to = to != null ? to : "";
     }
 
     public String getFrom() {
@@ -42,7 +42,7 @@ public class MessageData {
     }
 
     public void setFrom(String from) {
-        this.from = from;
+        this.from = from != null ? from : "";
     }
 
     public String getSubject() {
@@ -50,7 +50,7 @@ public class MessageData {
     }
 
     public void setSubject(String subject) {
-        this.subject = subject;
+        this.subject = subject != null ? subject : "";
     }
 
     public String getMessage() {
@@ -58,6 +58,6 @@ public class MessageData {
     }
 
     public void setMessage(String message) {
-        this.message = message;
+        this.message = message != null ? message : "";
     }
 }
