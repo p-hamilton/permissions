@@ -108,8 +108,7 @@ public class PermissionService extends Service {
 
     void initForegroundNotification(){
 
-        Intent contentIntent = new Intent("asc");
-        contentIntent.setClass(this, )
+        Intent contentIntent = new Intent(this, PermissionService.class);
         PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
         Intent discoverIntent = new Intent(this, PermissionService.class);
