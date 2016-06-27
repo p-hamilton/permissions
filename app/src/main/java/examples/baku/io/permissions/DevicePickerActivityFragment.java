@@ -1,5 +1,6 @@
 package examples.baku.io.permissions;
 
+import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,19 +11,14 @@ import examples.baku.io.permissions.util.EventFragment;
 /**
  * A placeholder fragment containing a simple view.
  */
-public class InboxFragment extends EventFragment {
+public class DevicePickerActivityFragment extends EventFragment {
 
-    public InboxFragment(){}
-
+    public DevicePickerActivityFragment() {
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.inbox_list, container, false);
-
-
-        return view;
+        return inflater.inflate(R.layout.fragment_device_picker, container, false);
     }
-
-
 }

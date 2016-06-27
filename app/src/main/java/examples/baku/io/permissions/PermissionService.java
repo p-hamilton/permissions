@@ -97,6 +97,10 @@ public class PermissionService extends Service {
         return mDeviceId;
     }
 
+    public Map<String, DeviceData> getDiscovered() {
+        return mDiscovered;
+    }
+
     public FirebaseDatabase getFirebaseDB() {
         return mFirebaseDB;
     }

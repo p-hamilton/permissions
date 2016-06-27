@@ -24,6 +24,9 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.UUID;
 
 import examples.baku.io.permissions.PermissionRequest;
@@ -35,6 +38,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
     public final static String EXTRA_MESSAGE_ID = "messageId";
 
+    private String mOwner;
     private String mId;
     private PermissionService mPermissionService;
     private DatabaseReference mMessageRef;
@@ -42,7 +46,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
     String sourceId;
 
-    SyncText mTo;
 
     EditText mToText;
     EditText mFrom;
@@ -129,9 +132,14 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             sendMessage();
         }else if(id == R.id.action_cast){
             if(mPermissionService != null){
-                PermissionRequest request = new PermissionRequest("cast");
-                request.getArguments().put("messageId", mId);
-                mPermissionService.sendRequest(request);
+                Set<String> dIds = new HashSet<>(mPermissionService.getDiscovered().keySet());
+                for(Iterator<String> iterator =  dIds.iterator(); iterator.hasNext();){
+                    String dId = iterator.next();
+                    mMessageRef.child("shared").child(dId).child("message").setValue(0);
+                }
+//                PermissionRequest request = new PermissionRequest("cast");
+//                request.getArguments().put("messageId", mId);
+//                mPermissionService.sendRequest(request);
             }
 
         }else if(id == R.id.action_settings){
@@ -156,9 +164,11 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder)service;
         mPermissionService = binder.getInstance();
         if(mPermissionService != null){
+            mOwner = mPermissionService.getDeviceId();
             mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
             mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
 
+            mMessageRef.child("owner").setValue(mOwner);
             mMessageRef.child("id").setValue(mId);
 
             linkTextField(mToText, "to");

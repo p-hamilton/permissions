@@ -28,12 +28,14 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseException;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Queue;
 
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
@@ -47,6 +49,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     }   //TODO: real logging
 
     private PermissionService mPermissionService;
+    private String mOwner;
     private FirebaseDatabase mFirebaseDB;
     private DatabaseReference mMessagesRef;
 
@@ -138,50 +141,12 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     public void onServiceConnected(ComponentName name, IBinder service) {
         PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder)service;
         mPermissionService = binder.getInstance();
-        if(mPermissionService != null){
+        if(mPermissionService != null) {
+            mOwner = mPermissionService.getDeviceId();
             mFirebaseDB = mPermissionService.getFirebaseDB();
             mMessagesRef = mFirebaseDB.getReference("emails").child("messages");
-            mMessagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    onMessagesUpdated(dataSnapshot);
-                    mInboxAdapter.notifyDataSetChanged();
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
-            mMessagesRef.addChildEventListener(new ChildEventListener() {
-                @Override
-                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                    onMessageUpdated(dataSnapshot);
-                    mInboxAdapter.notifyDataSetChanged();
-                }
-
-                @Override
-                public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-                    onMessageUpdated(dataSnapshot);
-                    mInboxAdapter.notifyDataSetChanged();
-                }
-
-                @Override
-                public void onChildRemoved(DataSnapshot dataSnapshot) {
-                    onMessageRemoved(dataSnapshot.getKey());
-                    mInboxAdapter.notifyDataSetChanged();
-                }
-
-                @Override
-                public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
+            mMessagesRef.addValueEventListener(messagesValueListener);
+            mMessagesRef.addChildEventListener(messageChildListener);
         }
     }
 
@@ -189,6 +154,51 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     public void onServiceDisconnected(ComponentName name) {
 
     }
+
+
+
+    private ChildEventListener messageChildListener = new ChildEventListener() {
+        @Override
+        public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+            onMessageUpdated(dataSnapshot);
+            mInboxAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+            onMessageUpdated(dataSnapshot);
+            mInboxAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onChildRemoved(DataSnapshot dataSnapshot) {
+            onMessageRemoved(dataSnapshot.getKey());
+            mInboxAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
+
+    private ValueEventListener messagesValueListener = new ValueEventListener() {
+        @Override
+        public void onDataChange(DataSnapshot dataSnapshot) {
+            onMessagesUpdated(dataSnapshot);
+            mInboxAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
 
     void onMessagesUpdated(DataSnapshot snapshot){
         if(snapshot == null) throw new IllegalArgumentException("null snapshot");
@@ -205,7 +215,12 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
 
         try{
             MessageData msg = snapshot.getValue(MessageData.class);
-            mMessages.put(msg.getId(), msg);
+            String key = msg.getId();
+            if(isValid(msg)){
+                mMessages.put(key, msg);
+            }else if(mMessages.containsKey(key)){    //remove if no longer valid
+                mMessages.remove(key);
+            }
         }catch (DatabaseException e){
             e.printStackTrace();
         }
@@ -215,6 +230,17 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         if(mMessages.containsKey(id)){
             mMessages.remove(id);
         }
+    }
+
+    //TODO: move this functionality to the server. On client only for demo purposes.
+    boolean isValid(MessageData msg){
+
+        if(mOwner.equals(msg.getOwner())){
+            return true;
+        } else if(msg.getShared().containsKey(mOwner)){
+            return true;
+        }
+        return false;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
@@ -297,5 +323,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     protected void onDestroy() {
         super.onDestroy();
         unbindService(this);
+//        mMessagesRef.removeEventListener(messagesValueListener);
+//        mMessagesRef.removeEventListener(messageChildListener);
     }
 }
