@@ -9,7 +9,7 @@
         android:id="@+id/card_leading"
         android:layout_width="62dp"
         android:layout_height="62dp"
-        android:src="@drawable/ic_mail_outline_black_24dp"/>
+        android:src="@drawable/ic_phone_android_black_24dp"/>
     <TextView
         android:id="@+id/card_title"
         android:layout_width="wrap_content"

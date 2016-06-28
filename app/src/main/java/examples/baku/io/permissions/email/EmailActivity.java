@@ -80,7 +80,8 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             });
         }
 
-        bindService(new Intent(this, PermissionService.class), this, Service.BIND_AUTO_CREATE);
+        PermissionService.start(this);
+        PermissionService.bind(this);
 
         mInboxAdapter = new MessagesAdapter(mMessages);
         mLayoutManager = new LinearLayoutManager(this);
@@ -237,9 +238,10 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
 
         if(mOwner.equals(msg.getOwner())){
             return true;
-        } else if(msg.getShared().containsKey(mOwner)){
-            return true;
         }
+//        else if(msg.getShared().containsKey(mOwner)){
+//            return true;
+//        }
         return false;
     }
 

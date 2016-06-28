@@ -27,6 +27,7 @@ public class SyncText {
 
     private String text = "";
     private int ver;
+    private String original = text;
     private BlockingQueue<SyncTextPatch> mPatchQueue;
 
     private diff_match_patch DMP = new diff_match_patch();
@@ -40,8 +41,13 @@ public class SyncText {
 
     private String mId;
 
+    private String mInstance;
+
+
     public SyncText(DatabaseReference reference, DatabaseReference output){
         if(reference == null) throw new IllegalArgumentException("null reference");
+
+        mInstance = UUID.randomUUID().toString();
 
         mSyncRef = reference;
         mOutputRef = output;
@@ -160,6 +166,7 @@ public class SyncText {
                         public void onDataChange(DataSnapshot dataSnapshot) {
                             if(dataSnapshot.exists() && dataSnapshot.getValue() != null){
                                 text = dataSnapshot.getValue(String.class);
+                                original = text;
                             }
                             updateCurrent();
                         }
@@ -185,6 +192,10 @@ public class SyncText {
 
             }
         });
+    }
+
+    public String getOriginal() {
+        return original;
     }
 
     private ChildEventListener mPatchListener = new ChildEventListener() {

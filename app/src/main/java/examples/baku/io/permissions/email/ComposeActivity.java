@@ -17,6 +17,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -24,12 +25,11 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
-import examples.baku.io.permissions.PermissionRequest;
+import examples.baku.io.permissions.DeviceData;
+import examples.baku.io.permissions.PermissionMessage;
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
 import examples.baku.io.permissions.synchronization.SyncText;
@@ -39,6 +39,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     public final static String EXTRA_MESSAGE_ID = "messageId";
 
     private String mOwner;
+    private String mDeviceId;
     private String mId;
     private PermissionService mPermissionService;
     private DatabaseReference mMessageRef;
@@ -64,6 +65,8 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     HashMap<String,DataSnapshot> mSnapshots = new HashMap<>();
     DataSnapshot currentSnapshot;
 
+    String original;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,6 +91,10 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             }
             if(intent.hasExtra("sourceId")){
                 sourceId = intent.getStringExtra("sourceId");
+            }
+            if(intent.hasExtra("review")){
+                original = intent.getStringExtra("review");
+                Log.e("asdasdasdsa", original);
             }
 
         }
@@ -132,14 +139,21 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             sendMessage();
         }else if(id == R.id.action_cast){
             if(mPermissionService != null){
-                Set<String> dIds = new HashSet<>(mPermissionService.getDiscovered().keySet());
-                for(Iterator<String> iterator =  dIds.iterator(); iterator.hasNext();){
-                    String dId = iterator.next();
-                    mMessageRef.child("shared").child(dId).child("message").setValue(0);
+                String dId = mPermissionService.getFocus();
+                if(dId != null){
+                    String focus = mPermissionService.getFocus();
+                    HashMap<String,Integer> rules = new HashMap<>();
+                    rules.put("message",0);
+                    rules.put("subject",0);
+                    mMessageRef.child("shared").child(dId).setValue(rules);
+
+                    PermissionMessage request = new PermissionMessage("cast");
+                    request.getArguments().put("messageId", mId);
+                    mPermissionService.sendRequest(request);
+                }else{
+                    Toast.makeText(this, "No cast target", Toast.LENGTH_SHORT).show();
                 }
-//                PermissionRequest request = new PermissionRequest("cast");
-//                request.getArguments().put("messageId", mId);
-//                mPermissionService.sendRequest(request);
+
             }
 
         }else if(id == R.id.action_settings){
@@ -153,8 +167,12 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 //        if(mMessageRef != null){
 //            mMessageRef.setValue(mMessageData);
 //        }
-        if(sourceId != null && mPermissionService != null){
-            mPermissionService.sendRequest(new PermissionRequest("request"));
+        if(mOwner != null && mPermissionService != null){
+            PermissionMessage request = new PermissionMessage("request");
+            request.getArguments().put("original", syncTexts.get("message").getOriginal());
+            request.getArguments().put("messageId", mId);
+            request.setTarget(mOwner);
+            mPermissionService.sendRequest(request);
         }
         finish();
     }
@@ -164,18 +182,82 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder)service;
         mPermissionService = binder.getInstance();
         if(mPermissionService != null){
-            mOwner = mPermissionService.getDeviceId();
             mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
             mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
 
-            mMessageRef.child("owner").setValue(mOwner);
+            mPermissionService.addDiscoveryListener(new PermissionService.DiscoveryListener() {
+                @Override
+                public void onChange(Map<String, DeviceData> devices) {
+
+                }
+
+                @Override
+                public void onDisassociate(String deviceId) {
+                    if(deviceId != null && deviceId.equals(mOwner)){
+                        finish();
+                    }
+                }
+            });
+            mDeviceId = mPermissionService.getDeviceId();
+
+            //TODO: hideous
+            mMessageRef.child("owner").addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    if(!dataSnapshot.exists() || dataSnapshot.getValue() == null){
+                        mOwner = mDeviceId;
+                        dataSnapshot.getRef().setValue(mOwner);
+                    }else{
+                        mOwner = dataSnapshot.getValue(String.class);
+                    }
+                    mMessageRef.child("shared").addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            if(dataSnapshot.exists() && dataSnapshot.getValue() != null){
+                                setSharingRules(dataSnapshot);
+                            }
+
+                            linkTextField(mToText, "to");
+                            linkTextField(mFrom, "from");
+                            linkTextField(mSubject, "subject");
+                            linkTextField(mMessage, "message");
+                        }
+                        @Override
+                        public void onCancelled(DatabaseError databaseError) {
+
+                        }
+                    });
+
+                }
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
+            });
+
             mMessageRef.child("id").setValue(mId);
 
-            linkTextField(mToText, "to");
-            linkTextField(mFrom, "from");
-            linkTextField(mSubject, "subject");
-            linkTextField(mMessage, "message");
+
         }
+    }
+
+    private DataSnapshot sharingRules;
+
+    public void setSharingRules(DataSnapshot sharingRules) {
+        this.sharingRules = sharingRules;
+    }
+
+    int FLAG_CAN_EDIT = 2<<1;
+
+    int canEdit(String key){
+        if(mOwner.equals(mDeviceId)){
+            return FLAG_CAN_EDIT;
+        }else if(sharingRules != null){
+            if(sharingRules.hasChild(mDeviceId) && sharingRules.child(mDeviceId).hasChild(key)){
+                return FLAG_CAN_EDIT;
+            }
+        }
+        return 0;
     }
 
     @Override
@@ -201,7 +283,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         syncText.setOnTextChangeListener(new SyncText.OnTextChangeListener() {
             @Override
             public void onTextChange(final String currentText) {
-                Log.e("mistake ",currentText);
                 final int sel = Math.min(edit.getSelectionStart(), currentText.length());
                 runOnUiThread(new Runnable() {
                     @Override
@@ -215,6 +296,21 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             }
         });
 
+
+        if(canEdit(key) == FLAG_CAN_EDIT) {
+            edit.setEnabled(true);
+//            edit.setInputType(EditorInfo.TYPE_NULL);
+            edit.setOnClickListener(null);
+        }else{
+//            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
+            edit.setEnabled(false);
+            edit.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    sendMessage();
+                }
+            });
+        }
 
         edit.addTextChangedListener(new TextWatcher() {
             @Override

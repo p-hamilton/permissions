@@ -21,7 +21,7 @@ public class EventFragment extends Fragment{
     public void onAttach(Context context) {
         super.onAttach(context);
         try {
-            EventFragmentListener mListener = (EventFragmentListener) context;
+            mListener = (EventFragmentListener) context;
         } catch (ClassCastException e) {
             throw new ClassCastException(context.toString() + " must implement EventFragmentListener");
         }

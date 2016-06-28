@@ -1,5 +1,8 @@
 package examples.baku.io.permissions;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Created by phamilton on 6/19/16.
  */
@@ -8,6 +11,7 @@ public class DeviceData {
     private String id;
     private String name;
     private Boolean active;
+    private Map<String, String> status = new HashMap<>();
 
     public DeviceData(){}
 
@@ -40,4 +44,11 @@ public class DeviceData {
         this.active = active;
     }
 
+    public Map<String, String> getStatus() {
+        return status;
+    }
+
+    public void setStatus(Map<String, String> status) {
+        this.status = status;
+    }
 }

@@ -36,8 +36,8 @@
             android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".DevicePickerActivity"
-            android:label="@string/title_activity_device_picker"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:label="Device Picker"
+            android:theme="@style/Theme.AppCompat.Light.Dialog"></activity>
     </application>
 
 </manifest>

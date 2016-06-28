@@ -10,18 +10,19 @@ import java.util.UUID;
 /**
  * Created by phamilton on 6/19/16.
  */
-public class PermissionRequest implements Parcelable{
+public class PermissionMessage implements Parcelable{
     private String id;
     private String type;
     private String target;
+    private String source;
     private Map<String, String> arguments = new HashMap<>();
 
-    public PermissionRequest(){}
+    public PermissionMessage(){}
 
-    public PermissionRequest(String type){
+    public PermissionMessage(String type){
         this(UUID.randomUUID().toString(), type);
     }
-    public PermissionRequest(String id, String type){
+    public PermissionMessage(String id, String type){
         this.id = id;
         this.type = type;
     }
@@ -58,6 +59,14 @@ public class PermissionRequest implements Parcelable{
         this.target = target;
     }
 
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -71,7 +80,7 @@ public class PermissionRequest implements Parcelable{
         dest.writeMap(arguments);
     }
 
-    private PermissionRequest(Parcel in) {
+    private PermissionMessage(Parcel in) {
         this.id = in.readString();
         this.type = in.readString();
         this.target = in.readString();
@@ -80,11 +89,11 @@ public class PermissionRequest implements Parcelable{
         this.arguments = in.readHashMap(String.class.getClassLoader());
     }
 
-    public static final Creator<PermissionRequest> CREATOR
-            = new Creator<PermissionRequest>() {
+    public static final Creator<PermissionMessage> CREATOR
+            = new Creator<PermissionMessage>() {
         @Override
-        public PermissionRequest createFromParcel(Parcel source) {
-            PermissionRequest result = new PermissionRequest();
+        public PermissionMessage createFromParcel(Parcel source) {
+            PermissionMessage result = new PermissionMessage();
             result.id = source.readString();
             result.type = source.readString();
             result.target = source.readString();
@@ -93,8 +102,8 @@ public class PermissionRequest implements Parcelable{
         }
 
         @Override
-        public PermissionRequest[] newArray(int size) {
-            return new PermissionRequest[0];
+        public PermissionMessage[] newArray(int size) {
+            return new PermissionMessage[0];
         }
 
     };

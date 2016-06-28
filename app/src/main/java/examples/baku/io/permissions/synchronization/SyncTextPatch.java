@@ -8,6 +8,7 @@ import java.util.concurrent.BlockingQueue;
 public class SyncTextPatch{
     private int ver;
     private String patch;
+    private String source;
 
     public SyncTextPatch() {}
 
@@ -32,6 +33,12 @@ public class SyncTextPatch{
         this.patch = patch;
     }
 
+    public String getSource() {
+        return source;
+    }
 
+    public void setSource(String source) {
+        this.source = source;
+    }
 }
 
