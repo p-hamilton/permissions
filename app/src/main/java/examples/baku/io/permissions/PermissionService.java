@@ -25,8 +25,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
-import examples.baku.io.permissions.email.ComposeActivity;
-import examples.baku.io.permissions.email.EmailActivity;
+import examples.baku.io.permissions.discovery.DeviceData;
+import examples.baku.io.permissions.discovery.DevicePickerActivity;
+import examples.baku.io.permissions.examples.ComposeActivity;
+import examples.baku.io.permissions.examples.EmailActivity;
+import examples.baku.io.permissions.messenger.Messenger;
+import examples.baku.io.permissions.messenger.Message;
 
 public class PermissionService extends Service {
 
@@ -49,6 +53,13 @@ public class PermissionService extends Service {
     FirebaseDatabase mFirebaseDB;
     DatabaseReference mDevicesReference;
     DatabaseReference mRequestsReference;
+
+
+    DatabaseReference mMessengerReference;
+    Messenger mMessenger;
+
+    DatabaseReference mPermissionsReference;
+    PermissionManager mPermissionManager;
 
     DatabaseReference mLocalDeviceReference;
 
@@ -93,11 +104,15 @@ public class PermissionService extends Service {
         mDevicesReference = mFirebaseDB.getReference("devices");
         mRequestsReference = mFirebaseDB.getReference("requests");
 
+        mPermissionsReference = mFirebaseDB.getReference("permissions");
+        mPermissionManager = new PermissionManager(mPermissionsReference);
+
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         initForegroundNotification();
 
         registerDevice();
+        initMessenger();
         initDiscovery();
 
         mRunning = true;
@@ -183,7 +198,89 @@ public class PermissionService extends Service {
     }
 
 
-    public void sendRequest(PermissionMessage request){
+    public void initMessenger(){
+        mMessengerReference = mFirebaseDB.getReference("messages");
+        mMessenger = new Messenger(mDeviceId, mMessengerReference);
+
+        mMessenger.on("start", new Messenger.Listener() {
+            @Override
+            public void call(String args, Messenger.Ack callback) {
+                Intent emailIntent = new Intent(PermissionService.this, EmailActivity.class);
+                emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(emailIntent);
+            }
+        });
+
+        mMessenger.on("disassociate", new Messenger.Listener() {
+            @Override
+            public void call(String args, Messenger.Ack callback) {
+//                if(request.getSource() != null){
+//                    String dId = request.getSource();
+//                    for (Iterator<DiscoveryListener> iterator = mDiscoveryListener.iterator(); iterator.hasNext(); ) {
+//                        DiscoveryListener listener  = iterator.next();
+//                        listener.onDisassociate(dId);
+//                    }
+//                }
+            }
+        });
+
+        mMessenger.on("cast", new Messenger.Listener() {
+            @Override
+            public void call(String args, Messenger.Ack callback) {
+                Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
+//                if(request.getArguments().containsKey("messageId")){
+//                    emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
+//                }
+                emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(emailIntent);
+            }
+        });
+
+        mMessenger.on("request", new Messenger.Listener() {
+            @Override
+            public void call(String args, Messenger.Ack callback) {
+//                String dId = request.getSource();
+//                if(!mDiscovered.containsKey(dId)) return;
+//
+//                DeviceData device = mDiscovered.get(dId);
+//                String title = device.getName();
+//                String subtitle = "Attempting to send email";   //default
+//                if(device.getStatus() != null && device.getStatus().containsKey("description")){
+//                    subtitle = device.getStatus().get("description");
+//                }
+//
+//                int icon = R.drawable.ic_phone_android_black_24dp;
+//
+//                Intent reviewIntent = new Intent(PermissionService.this, ComposeActivity.class);
+//                reviewIntent.putExtra("review", request.getArguments().get("original"));
+//                reviewIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
+//
+//                Intent dismissIntent = new Intent(PermissionService.this, PermissionService.class);
+//                dismissIntent.putExtra("type", "dismiss");
+//                dismissIntent.putExtra("deviceId", dId);
+//                PendingIntent dismissPending = PendingIntent.getService(PermissionService.this, 320, dismissIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+//
+//
+//                PendingIntent pi = PendingIntent.getActivity(PermissionService.this ,5, reviewIntent,PendingIntent.FLAG_CANCEL_CURRENT);
+//                Notification notification = new Notification.Builder(PermissionService.this)
+//                        .setContentTitle(title)
+//                        .setContentText(subtitle)
+//                        .setSmallIcon(icon)
+//                        .setVibrate(new long[]{100})
+//                        .setPriority(Notification.PRIORITY_MAX)
+//                        .setContentIntent(pi)
+//                        .setDeleteIntent(dismissPending)
+//                        .addAction(new Notification.Action.Builder (R.drawable.ic_check_black_24dp, "Accept", pi).build())
+//                        .addAction(new Notification.Action.Builder (R.drawable.ic_close_black_24dp, "Reject", pi).build())
+//                        .build();
+//                mNotificationManager.notify(FOCUS_NOTIFICATION, notification);
+            }
+        });
+
+
+    }
+
+    public void sendRequest(Message request){
         if(request == null) return;//throw new IllegalArgumentException("null request");
         if(request.getTarget() == null){
             if(tempTarget == null){
@@ -203,7 +300,7 @@ public class PermissionService extends Service {
             l("start command "+type);
             if("sendRequest".equals(type)){
                 if(intent.hasExtra("request")){
-                    PermissionMessage request = intent.getParcelableExtra("request");
+                    Message request = intent.getParcelableExtra("request");
                     sendRequest(request);
                 }
 
@@ -215,7 +312,7 @@ public class PermissionService extends Service {
                     startActivity(discoveryIntent);
                 }
             }else if("dismiss".equals(type)){
-                PermissionMessage request = new PermissionMessage("disassociate");
+                Message request = new Message("disassociate");
                 request.setTarget(tempTarget);
                 sendRequest(request);
                 setFocus(null);
@@ -241,7 +338,7 @@ public class PermissionService extends Service {
 
                         Intent castIntent = new Intent(this, PermissionService.class);
                         castIntent.putExtra("type", "sendRequest");
-                        castIntent.putExtra("request", new PermissionMessage("start"));
+                        castIntent.putExtra("request", new Message("start"));
                         PendingIntent castPendingIntent = PendingIntent.getService(this, 0, castIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
                         Notification notification = new Notification.Builder(this)
@@ -293,8 +390,7 @@ public class PermissionService extends Service {
             }
         });
 
-        //listen for all requests directly targetted at this device
-        mRequestsReference.orderByChild("target").equalTo(mDeviceId).addChildEventListener(requestListener);
+
     }
 
     private DeviceData mLocalDevice;
@@ -356,124 +452,7 @@ public class PermissionService extends Service {
                 }
             }
         }
-
-
     }
-
-    ChildEventListener requestListener = new ChildEventListener() {
-        @Override
-        public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-            if(!dataSnapshot.exists()) return;
-            try{
-                PermissionMessage request = dataSnapshot.getValue(PermissionMessage.class);
-                if(request == null) return;
-                l("request: "  + request.getType());
-                if("launch".equals(request.getType())){
-//                    Intent flutterIntent = getPackageManager().getLaunchIntentForPackage(FLUTTER_PACKAGE);
-//                    flutterIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                    startActivity(flutterIntent);
-
-                }else if("start".equals(request.getType())){
-                    Intent emailIntent = new Intent(PermissionService.this, EmailActivity.class);
-                    emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(emailIntent);
-//                    Intent flutterIntent = getPackageManager().getLaunchIntentForPackage(FLUTTER_PACKAGE);
-//                    flutterIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                    startActivity(flutterIntent);
-//                    mMessenger.send(FLUTTER_PACKAGE, "navigate", request.getArguments().get("uuid"));
-
-                }else if("disassociate".equals(request.getType())){
-                    if(request.getSource() != null){
-                        String dId = request.getSource();
-                        for (Iterator<DiscoveryListener> iterator = mDiscoveryListener.iterator(); iterator.hasNext(); ) {
-                            DiscoveryListener listener  = iterator.next();
-                            listener.onDisassociate(dId);
-                        }
-                    }
-//                    Intent emailIntent = new Intent(PermissionService.this, EmailActivity.class);
-//                    emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                    startActivity(emailIntent);
-//                    Intent flutterIntent = getPackageManager().getLaunchIntentForPackage(FLUTTER_PACKAGE);
-//                    flutterIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                    startActivity(flutterIntent);
-//                    mMessenger.send(FLUTTER_PACKAGE, "navigate", request.getArguments().get("uuid"));
-
-                }else if("cast".equals(request.getType())){
-                    Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
-                    if(request.getArguments().containsKey("messageId")){
-                        emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
-                    }
-                    emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(emailIntent);
-//                    Intent flutterIntent = getPackageManager().getLaunchIntentForPackage(FLUTTER_PACKAGE);
-//                    flutterIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//                    startActivity(flutterIntent);
-//                    PleaseNotification.updateRequest(PleaseService.this, "Request: send message");
-
-                }else if("request".equals(request.getType())){
-                    String dId = request.getSource();
-                    if(!mDiscovered.containsKey(dId)) return;
-
-                    DeviceData device = mDiscovered.get(dId);
-                    String title = device.getName();
-                    String subtitle = "Attempting to send email";   //default
-                    if(device.getStatus() != null && device.getStatus().containsKey("description")){
-                        subtitle = device.getStatus().get("description");
-                    }
-
-                    int icon = R.drawable.ic_phone_android_black_24dp;
-
-                    Intent reviewIntent = new Intent(PermissionService.this, ComposeActivity.class);
-                    reviewIntent.putExtra("review", request.getArguments().get("original"));
-                    reviewIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
-
-                    Intent dismissIntent = new Intent(PermissionService.this, PermissionService.class);
-                    dismissIntent.putExtra("type", "dismiss");
-                    dismissIntent.putExtra("deviceId", dId);
-                    PendingIntent dismissPending = PendingIntent.getService(PermissionService.this, 320, dismissIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-
-
-                    PendingIntent pi = PendingIntent.getActivity(PermissionService.this ,5, reviewIntent,PendingIntent.FLAG_CANCEL_CURRENT);
-                        Notification notification = new Notification.Builder(PermissionService.this)
-                                .setContentTitle(title)
-                                .setContentText(subtitle)
-                                .setSmallIcon(icon)
-                                .setVibrate(new long[]{100})
-                                .setPriority(Notification.PRIORITY_MAX)
-                                .setContentIntent(pi)
-                                .setDeleteIntent(dismissPending)
-                                .addAction(new Notification.Action.Builder (R.drawable.ic_check_black_24dp, "Accept", pi).build())
-                                .addAction(new Notification.Action.Builder (R.drawable.ic_close_black_24dp, "Reject", pi).build())
-                                .build();
-                        mNotificationManager.notify(FOCUS_NOTIFICATION, notification);
-                }
-            }catch(DatabaseException e){
-                e.printStackTrace();
-            } finally {
-                dataSnapshot.getRef().removeValue();
-            }
-        }
-
-        @Override
-        public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-
-        }
-
-        @Override
-        public void onChildRemoved(DataSnapshot dataSnapshot) {
-
-        }
-
-        @Override
-        public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-
-        }
-
-        @Override
-        public void onCancelled(DatabaseError databaseError) {
-
-        }
-    };
 
     static int x =11;
     public static void update(Context context, String title){

@@ -1,7 +1,5 @@
-package examples.baku.io.permissions;
+package examples.baku.io.permissions.discovery;
 
-import android.content.Intent;
-import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
@@ -9,7 +7,6 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -17,9 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import examples.baku.io.permissions.email.ComposeActivity;
-import examples.baku.io.permissions.email.EmailActivity;
-import examples.baku.io.permissions.email.MessageData;
+import examples.baku.io.permissions.R;
 import examples.baku.io.permissions.util.EventFragment;
 
 /**

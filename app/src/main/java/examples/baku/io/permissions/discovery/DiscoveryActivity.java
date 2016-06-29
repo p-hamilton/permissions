@@ -1,4 +1,4 @@
-package examples.baku.io.permissions;
+package examples.baku.io.permissions.discovery;
 
 import android.support.design.widget.TabLayout;
 import android.support.design.widget.FloatingActionButton;
@@ -18,6 +18,8 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import android.widget.TextView;
+
+import examples.baku.io.permissions.R;
 
 public class DiscoveryActivity extends AppCompatActivity {
 

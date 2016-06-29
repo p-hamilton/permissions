@@ -1,4 +1,4 @@
-package examples.baku.io.permissions;
+package examples.baku.io.permissions.discovery;
 
 import java.util.HashMap;
 import java.util.Map;

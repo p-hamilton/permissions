@@ -1,8 +1,4 @@
-package examples.baku.io.permissions.email;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+package examples.baku.io.permissions.examples;
 
 /**
  * Created by phamilton on 6/22/16.
@@ -14,8 +10,8 @@ public class MessageData {
     String from = "";
     String subject = "";
     String message = "";
-    String owner;
-    Map<String, Map<String, Integer>> shared = new HashMap<>();
+//    String owner;
+//    Map<String, Map<String, Integer>> shared = new HashMap<>();
 
     public MessageData(){}
 
@@ -66,20 +62,21 @@ public class MessageData {
     public void setMessage(String message) {
         this.message = message != null ? message : "";
     }
+//
+//    public String getOwner() {
+//        return owner;
+//    }
+//
+//    public void setOwner(String owner) {
+//        this.owner = owner;
+//    }
+//
+//    public Map<String, Map<String, Integer>> getShared() {
+//        return shared;
+//    }
+//
+//    public void setShared(Map<String, Map<String, Integer>> shared) {
+//        this.shared = shared;
+//    }
 
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
-
-    public Map<String, Map<String, Integer>> getShared() {
-        return shared;
-    }
-
-    public void setShared(Map<String, Map<String, Integer>> shared) {
-        this.shared = shared;
-    }
 }

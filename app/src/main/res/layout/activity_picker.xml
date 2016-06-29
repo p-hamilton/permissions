@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    tools:context="examples.baku.io.permissions.DevicePickerActivity">
+    tools:context=".discovery.DevicePickerActivity">
 
     <include layout="@layout/content_device_picker" />
 

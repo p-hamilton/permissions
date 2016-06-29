@@ -1,4 +1,4 @@
-package examples.baku.io.permissions.email;
+package examples.baku.io.permissions.examples;
 
 import android.app.Service;
 import android.content.ComponentName;
@@ -28,8 +28,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import examples.baku.io.permissions.DeviceData;
-import examples.baku.io.permissions.PermissionMessage;
+import examples.baku.io.permissions.discovery.DeviceData;
+import examples.baku.io.permissions.messenger.Message;
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
 import examples.baku.io.permissions.synchronization.SyncText;
@@ -147,7 +147,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                     rules.put("subject",0);
                     mMessageRef.child("shared").child(dId).setValue(rules);
 
-                    PermissionMessage request = new PermissionMessage("cast");
+                    Message request = new Message("cast");
                     request.getArguments().put("messageId", mId);
                     mPermissionService.sendRequest(request);
                 }else{
@@ -164,15 +164,12 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     }
 
     void sendMessage(){
-//        if(mMessageRef != null){
-//            mMessageRef.setValue(mMessageData);
-//        }
         if(mOwner != null && mPermissionService != null){
-            PermissionMessage request = new PermissionMessage("request");
-            request.getArguments().put("original", syncTexts.get("message").getOriginal());
-            request.getArguments().put("messageId", mId);
-            request.setTarget(mOwner);
-            mPermissionService.sendRequest(request);
+//            Message request = new Message("request");
+//            request.getArguments().put("original", syncTexts.get("message").getOriginal());
+//            request.getArguments().put("messageId", mId);
+//            request.setTarget(mOwner);
+//            mPermissionService.sendRequest(request);
         }
         finish();
     }
@@ -184,6 +181,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         if(mPermissionService != null){
             mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
             mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
+
 
             mPermissionService.addDiscoveryListener(new PermissionService.DiscoveryListener() {
                 @Override
