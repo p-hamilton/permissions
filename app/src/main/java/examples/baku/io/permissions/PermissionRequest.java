@@ -11,12 +11,15 @@ public class PermissionRequest {
     private String path;
 
 
-    public void grant(){
-
+    public void grant(int permissions){
+        this.granted |= permissions;
+    }
+    public void retract(int permissions){
+        this.granted &= ~permissions;
     }
 
     public void deny(){
-
+        cancel();
     }
 
     public void cancel(){
@@ -30,11 +33,7 @@ public class PermissionRequest {
             this.request = new PermissionRequest();
         }
 
-        public set Read
 
     }
-
-
-
 
 }

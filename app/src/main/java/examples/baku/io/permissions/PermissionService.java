@@ -105,8 +105,7 @@ public class PermissionService extends Service {
         mRequestsReference = mFirebaseDB.getReference("requests");
 
         mPermissionsReference = mFirebaseDB.getReference("permissions");
-        mPermissionManager = new PermissionManager(mPermissionsReference);
-
+        mPermissionManager = new PermissionManager(mPermissionsReference, mDeviceId);
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         initForegroundNotification();
@@ -454,16 +453,6 @@ public class PermissionService extends Service {
         }
     }
 
-    static int x =11;
-    public static void update(Context context, String title){
-        int icon = R.drawable.ic_phone_android_black_24dp;
-        NotificationManager notificationManager = (NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
-        Notification notification = new Notification.Builder(context)
-                .setContentTitle(title)
-                .setSmallIcon(icon)
-                .build();
-        notificationManager.notify(++x, notification);
-    }
 
     public static void start(Context context){
         context.startService(new Intent(context, PermissionService.class));

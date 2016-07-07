@@ -10,6 +10,7 @@ import java.util.UUID;
  */
 public class Message implements Parcelable{
     private String id;
+    private String parent;
     private String type;
     private String target;
     private String source;
@@ -34,6 +35,14 @@ public class Message implements Parcelable{
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getParent() {
+        return parent;
+    }
+
+    public void setParent(String parent) {
+        this.parent = parent;
     }
 
     public String getType() {
@@ -75,6 +84,19 @@ public class Message implements Parcelable{
 
     public void setCallback(boolean callback) {
         this.callback = callback;
+    }
+
+
+    public Message getChildInstance(){
+        Message result = new Message();
+        result.id = UUID.randomUUID().toString();
+        result.parent = this.id;
+        result.type = this.type;
+        result.target = this.target;
+        result.source = this.source;
+        result.message = this.message;
+        result.callback = this.callback;
+        return result;
     }
 
     @Override

@@ -1,13 +1,19 @@
 package examples.baku.io.permissions.messenger;
 
+import android.provider.ContactsContract;
+import android.widget.NumberPicker;
+
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseException;
 import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Created by phamilton on 6/28/16.
@@ -21,8 +27,14 @@ public class Messenger implements ChildEventListener {
 
     static final String KEY_TARGET = "target";
 
+    static final String KEY_GROUPS = "_groups";
+
     private String mId;
     private DatabaseReference mReference;
+
+    //hacky client side grouping
+    private DatabaseReference mGroupsReference;
+    private DataSnapshot mGroups;
 
     final private Map<String, Listener> mListeners = new HashMap<>();
     final private Map<String, Ack> mCallbacks = new HashMap<>();
@@ -31,6 +43,9 @@ public class Messenger implements ChildEventListener {
         this.mId = id;
         this.mReference = reference;
         this.mReference.orderByChild(KEY_TARGET).equalTo(mId).addChildEventListener(this);
+
+        this.mGroupsReference = mReference.child(KEY_GROUPS);
+        this.mGroupsReference.addValueEventListener(groupsListener);
     }
 
     public Emitter to(final String target){
@@ -46,7 +61,21 @@ public class Messenger implements ChildEventListener {
                     mCallbacks.put(message.getId(), callback);
                     message.setCallback(true);
                 }
-                mReference.child(message.getId()).setValue(message);
+
+                if(mGroups == null || mGroups.hasChild(target)){
+                    message.setTarget(target);
+                    mReference.child(message.getId()).setValue(message);
+                }else if(mGroups.exists()){
+                        DataSnapshot members = mGroups.child(target);
+                        if(members.exists()){
+                            for(Iterator<DataSnapshot> iterator = members.getChildren().iterator(); iterator.hasNext();){
+                                String subTarget = iterator.next().getKey();
+                                Message childMessage = message.getChildInstance();
+                                childMessage.setTarget(subTarget);
+                                mReference.child(childMessage.getId()).setValue(childMessage);
+                            }
+                        }
+                    }
             }
         };
     }
@@ -64,6 +93,26 @@ public class Messenger implements ChildEventListener {
             mListeners.remove(event);
         }
     }
+
+    public void join(String group){
+        mGroupsReference.child(group).child(mId).setValue(0);
+    }
+
+    public void leave(String group){
+        mGroupsReference.child(group).child(mId).removeValue();
+    }
+
+    ValueEventListener groupsListener = new ValueEventListener() {
+        @Override
+        public void onDataChange(DataSnapshot dataSnapshot) {
+
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
 
 
     @Override
