@@ -151,6 +151,9 @@ public class PermissionService extends Service {
     }
 
 
+    public PermissionManager getPermissionManager() {
+        return mPermissionManager;
+    }
 
     public String getDeviceId() {
         return mDeviceId;

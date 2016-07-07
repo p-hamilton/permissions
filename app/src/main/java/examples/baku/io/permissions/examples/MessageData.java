@@ -62,21 +62,5 @@ public class MessageData {
     public void setMessage(String message) {
         this.message = message != null ? message : "";
     }
-//
-//    public String getOwner() {
-//        return owner;
-//    }
-//
-//    public void setOwner(String owner) {
-//        this.owner = owner;
-//    }
-//
-//    public Map<String, Map<String, Integer>> getShared() {
-//        return shared;
-//    }
-//
-//    public void setShared(Map<String, Map<String, Integer>> shared) {
-//        this.shared = shared;
-//    }
 
 }

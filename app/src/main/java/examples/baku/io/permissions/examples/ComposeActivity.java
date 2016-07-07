@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import examples.baku.io.permissions.PermissionManager;
 import examples.baku.io.permissions.discovery.DeviceData;
 import examples.baku.io.permissions.messenger.Message;
 import examples.baku.io.permissions.PermissionService;
@@ -263,6 +264,24 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
     }
 
+    void wrapTextField(final EditText edit, final String key){
+        mPermissionService.getPermissionManager().addOnPermissionChangeListener(key, new PermissionManager.OnPermissionChangeListener() {
+            @Override
+            public void onPermissionChange(int current) {
+                if((current & PermissionManager.FLAG_WRITE) == PermissionManager.FLAG_WRITE){
+                    linkTextField(edit, key);
+                }else{
+                    unlinkTextField(key);
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
+
     void unlinkTextField(String key){
         if(syncTexts.containsKey(key)){
             syncTexts.get(key).unlink();
@@ -274,6 +293,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     }
 
     void linkTextField(final EditText edit, final String key){
+
 
         final SyncText syncText = new SyncText(mSyncedMessageRef.child(key),mMessageRef.child(key));
         syncTexts.put(key, syncText);
