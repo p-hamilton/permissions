@@ -20,6 +20,9 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -105,7 +108,7 @@ public class PermissionService extends Service {
         mRequestsReference = mFirebaseDB.getReference("requests");
 
         mPermissionsReference = mFirebaseDB.getReference("permissions");
-        mPermissionManager = new PermissionManager(mPermissionsReference, mDeviceId);
+        mPermissionManager = new PermissionManager(mFirebaseDB.getReference(), mDeviceId);
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         initForegroundNotification();
@@ -115,6 +118,10 @@ public class PermissionService extends Service {
         initDiscovery();
 
         mRunning = true;
+    }
+
+    public Messenger getMessenger() {
+        return mMessenger;
     }
 
     public String getFocus(){
@@ -153,6 +160,13 @@ public class PermissionService extends Service {
 
     public PermissionManager getPermissionManager() {
         return mPermissionManager;
+    }
+
+    public PermissionManager.PermissionReference getReference(String path){
+        if(mPermissionManager != null){
+            return mPermissionManager.getResource(path);
+        }
+        return null;
     }
 
     public String getDeviceId() {
@@ -230,9 +244,7 @@ public class PermissionService extends Service {
             @Override
             public void call(String args, Messenger.Ack callback) {
                 Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
-//                if(request.getArguments().containsKey("messageId")){
-//                    emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
-//                }
+                    emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, args);
                 emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(emailIntent);
             }
@@ -241,58 +253,69 @@ public class PermissionService extends Service {
         mMessenger.on("request", new Messenger.Listener() {
             @Override
             public void call(String args, Messenger.Ack callback) {
-//                String dId = request.getSource();
-//                if(!mDiscovered.containsKey(dId)) return;
-//
-//                DeviceData device = mDiscovered.get(dId);
-//                String title = device.getName();
-//                String subtitle = "Attempting to send email";   //default
-//                if(device.getStatus() != null && device.getStatus().containsKey("description")){
-//                    subtitle = device.getStatus().get("description");
-//                }
-//
-//                int icon = R.drawable.ic_phone_android_black_24dp;
-//
-//                Intent reviewIntent = new Intent(PermissionService.this, ComposeActivity.class);
-//                reviewIntent.putExtra("review", request.getArguments().get("original"));
-//                reviewIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, request.getArguments().get("messageId"));
-//
-//                Intent dismissIntent = new Intent(PermissionService.this, PermissionService.class);
-//                dismissIntent.putExtra("type", "dismiss");
-//                dismissIntent.putExtra("deviceId", dId);
-//                PendingIntent dismissPending = PendingIntent.getService(PermissionService.this, 320, dismissIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-//
-//
-//                PendingIntent pi = PendingIntent.getActivity(PermissionService.this ,5, reviewIntent,PendingIntent.FLAG_CANCEL_CURRENT);
-//                Notification notification = new Notification.Builder(PermissionService.this)
-//                        .setContentTitle(title)
-//                        .setContentText(subtitle)
-//                        .setSmallIcon(icon)
-//                        .setVibrate(new long[]{100})
-//                        .setPriority(Notification.PRIORITY_MAX)
-//                        .setContentIntent(pi)
-//                        .setDeleteIntent(dismissPending)
-//                        .addAction(new Notification.Action.Builder (R.drawable.ic_check_black_24dp, "Accept", pi).build())
-//                        .addAction(new Notification.Action.Builder (R.drawable.ic_close_black_24dp, "Reject", pi).build())
-//                        .build();
-//                mNotificationManager.notify(FOCUS_NOTIFICATION, notification);
+
+                try {
+                    JSONObject arguments = new JSONObject(args);
+                    String dId = arguments.getString("deviceId");
+                    String messageId = arguments.getString("messageId");
+                    String description = arguments.getString("description");
+                    if(!mDiscovered.containsKey(dId)) return;
+
+                    DeviceData device = mDiscovered.get(dId);
+                    String title = device.getName();
+                    String subtitle = description;   //default
+                    if(device.getStatus() != null && device.getStatus().containsKey("description")){
+                        subtitle = device.getStatus().get("description");
+                    }
+
+                    int icon = R.drawable.ic_phone_android_black_24dp;
+
+                    Intent reviewIntent = new Intent(PermissionService.this, ComposeActivity.class);
+                    reviewIntent.putExtra("review", "");
+                    reviewIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, messageId);
+
+                    Intent dismissIntent = new Intent(PermissionService.this, PermissionService.class);
+                    dismissIntent.putExtra("type", "dismiss");
+                    dismissIntent.putExtra("deviceId", dId);
+                    PendingIntent dismissPending = PendingIntent.getService(PermissionService.this, 320, dismissIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+
+
+                    PendingIntent pi = PendingIntent.getActivity(PermissionService.this ,5, reviewIntent,PendingIntent.FLAG_CANCEL_CURRENT);
+
+                    Notification notification = new Notification.Builder(PermissionService.this)
+                            .setContentTitle(title)
+                            .setContentText(subtitle)
+                            .setSmallIcon(icon)
+                            .setVibrate(new long[]{100})
+                            .setPriority(Notification.PRIORITY_MAX)
+                            .setContentIntent(pi)
+                            .setDeleteIntent(dismissPending)
+                            .addAction(new Notification.Action.Builder (R.drawable.ic_check_black_24dp, "Accept", pi).build())
+                            .addAction(new Notification.Action.Builder (R.drawable.ic_close_black_24dp, "Reject", pi).build())
+                            .build();
+                    mNotificationManager.notify(/*FOCUS_NOTIFICATION*/help++, notification);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
             }
         });
 
 
     }
+    int help = 123;
 
-    public void sendRequest(Message request){
-        if(request == null) return;//throw new IllegalArgumentException("null request");
-        if(request.getTarget() == null){
-            if(tempTarget == null){
-                throw new RuntimeException("Invalid request");
-            }
-            request.setTarget(tempTarget);
-        }
-        request.setSource(mDeviceId);
-        mRequestsReference.child(request.getId()).setValue(request);
-    }
+//    public void sendRequest(Message request){
+//        if(request == null) return;//throw new IllegalArgumentException("null request");
+//        if(request.getTarget() == null){
+//            if(tempTarget == null){
+//                new RuntimeException("Invalid request").printStackTrace();
+//            }
+//            request.setTarget(tempTarget);
+//        }
+//        request.setSource(mDeviceId);
+//        mRequestsReference.child(request.getId()).setValue(request);
+//    }
 
     int notificationIndex = 1111;
     @Override
@@ -303,7 +326,7 @@ public class PermissionService extends Service {
             if("sendRequest".equals(type)){
                 if(intent.hasExtra("request")){
                     Message request = intent.getParcelableExtra("request");
-                    sendRequest(request);
+//                    sendRequest(request);
                 }
 
             }else if("discover".equals(type)){
@@ -316,7 +339,7 @@ public class PermissionService extends Service {
             }else if("dismiss".equals(type)){
                 Message request = new Message("disassociate");
                 request.setTarget(tempTarget);
-                sendRequest(request);
+//                sendRequest(request);
                 setFocus(null);
 
 

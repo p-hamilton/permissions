@@ -59,6 +59,9 @@ public class PermissionManager {
 
 
     PermissionReference getResource(String path){
+        if(!resources.containsKey(path)){
+            resources.put(path, new PermissionReference(path));
+        }
         return resources.get(path);
     }
 
@@ -80,11 +83,11 @@ public class PermissionManager {
         final Set<OnRequestListener> requestListeners = new HashSet<>();
         final Set<OnReferralListener> referralListeners = new HashSet<>();
 
-        int currentPermissions = 0;
+        int currentPermissions = -1;
 
         public PermissionReference(String path) {
             this.path = path;
-            this.permissions.put(null, defaultPermissions);
+//            this.permissions.put(null, defaultPermissions);
 
             mValueReference = mDatabaseReference.child(path);
             mPermissionReference = mDatabaseReference.child(KEY_RULES).child(path).child(KEY_PERMISSIONS);
@@ -92,7 +95,7 @@ public class PermissionManager {
         }
 
         public void setPermission(String group, int permission){
-            mPermissionReference.child(group).setValue(defaultPermissions);
+            mPermissionReference.child(group).setValue(permission);
         }
 
         public void removeOnRequestListener(OnRequestListener requestListener) {
@@ -122,7 +125,23 @@ public class PermissionManager {
 
         public OnPermissionChangeListener addOnPermissionChangeListener( OnPermissionChangeListener permissionChangeListener) {
             permissionListeners.add(permissionChangeListener);
-            mDatabaseReference.addChildEventListener(mPermissionDatabaseListener);
+            mPermissionReference.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    if(dataSnapshot.exists()){
+                        for(DataSnapshot child : dataSnapshot.getChildren()){
+                            permissions.put(child.getKey(), child.getValue(Integer.class));
+                        }
+                    }
+                    refreshPermissions();
+                    mPermissionReference.addChildEventListener(mPermissionDatabaseListener);
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
+            });
 
             return permissionChangeListener;
         }
@@ -160,16 +179,20 @@ public class PermissionManager {
         private void refreshPermissions(){
             if(permissionListeners.size() > 0){
                 int highestPermissions = 0;
-                for (Iterator<Integer> iterator = permissions.values().iterator(); iterator.hasNext(); ) {
-                    int perms = iterator.next();
+                for (Iterator<String> iterator = permissions.keySet().iterator(); iterator.hasNext(); ) {
+                    String key = iterator.next();
+                    if(!mId.equals(key)){
+                        continue;
+                    }
+                    int perms = permissions.get(key);
                     highestPermissions |= perms;
                 }
-                if(currentPermissions != highestPermissions){
+//                if(currentPermissions != highestPermissions){
                     currentPermissions = highestPermissions;
                     for (OnPermissionChangeListener listener : permissionListeners) {
                         listener.onPermissionChange(highestPermissions);
                     }
-                }
+//                }
             }
         }
 

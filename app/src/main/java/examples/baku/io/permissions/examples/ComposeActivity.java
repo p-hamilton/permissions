@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.design.widget.FloatingActionButton;
@@ -11,11 +12,13 @@ import android.support.design.widget.TextInputLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -23,6 +26,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +65,8 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     TextInputLayout mSubjectLayout;
     TextInputLayout mMessageLayout;
 
+
+    Map<String, Integer> permissions = new HashMap<>();
 
     HashMap<String,SyncText> syncTexts = new HashMap<>();
 
@@ -143,14 +151,20 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 String dId = mPermissionService.getFocus();
                 if(dId != null){
                     String focus = mPermissionService.getFocus();
-                    HashMap<String,Integer> rules = new HashMap<>();
-                    rules.put("message",0);
-                    rules.put("subject",0);
-                    mMessageRef.child("shared").child(dId).setValue(rules);
 
-                    Message request = new Message("cast");
-                    request.getArguments().put("messageId", mId);
-                    mPermissionService.sendRequest(request);
+                    mPermissionService.getReference("emails/messages/"+mId+"/to").setPermission(focus,1);
+                    mPermissionService.getReference("emails/messages/"+mId+"/from").setPermission(focus,2);
+
+                    mPermissionService.getMessenger().to(focus).emit("cast", mId);
+
+//                    HashMap<String,Integer> rules = new HashMap<>();
+//                    rules.put("message",0);
+//                    rules.put("subject",0);
+//                    mMessageRef.child("shared").child(dId).setValue(rules);
+//
+//                    Message request = new Message("cast");
+//                    request.getArguments().put("messageId", mId);
+//                    mPermissionService.sendRequest(request);
                 }else{
                     Toast.makeText(this, "No cast target", Toast.LENGTH_SHORT).show();
                 }
@@ -166,6 +180,17 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
     void sendMessage(){
         if(mOwner != null && mPermissionService != null){
+            try {
+                JSONObject args = new JSONObject();
+                args.put("deviceId", mDeviceId);
+                args.put("messageId", mId);
+                args.put("resourceKey", "send");
+                args.put("description", "Attempitng to send message");
+                mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
 //            Message request = new Message("request");
 //            request.getArguments().put("original", syncTexts.get("message").getOriginal());
 //            request.getArguments().put("messageId", mId);
@@ -209,23 +234,29 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                     }else{
                         mOwner = dataSnapshot.getValue(String.class);
                     }
-                    mMessageRef.child("shared").addValueEventListener(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot dataSnapshot) {
-                            if(dataSnapshot.exists() && dataSnapshot.getValue() != null){
-                                setSharingRules(dataSnapshot);
-                            }
 
-                            linkTextField(mToText, "to");
-                            linkTextField(mFrom, "from");
-                            linkTextField(mSubject, "subject");
-                            linkTextField(mMessage, "message");
-                        }
-                        @Override
-                        public void onCancelled(DatabaseError databaseError) {
 
-                        }
-                    });
+                    wrapTextField(mToText, "to");
+                    wrapTextField(mFrom, "from");
+                    wrapTextField(mSubject, "subject");
+                    wrapTextField(mMessage, "message");
+//                    mMessageRef.child("shared").addValueEventListener(new ValueEventListener() {
+//                        @Override
+//                        public void onDataChange(DataSnapshot dataSnapshot) {
+//                            if(dataSnapshot.exists() && dataSnapshot.getValue() != null){
+//                                setSharingRules(dataSnapshot);
+//                            }
+//
+//                            linkTextField(mToText, "to");
+//                            linkTextField(mFrom, "from");
+//                            linkTextField(mSubject, "subject");
+//                            linkTextField(mMessage, "message");
+//                        }
+//                        @Override
+//                        public void onCancelled(DatabaseError databaseError) {
+//
+//                        }
+//                    });
 
                 }
                 @Override
@@ -239,6 +270,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
         }
     }
+
 
     private DataSnapshot sharingRules;
 
@@ -265,21 +297,55 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     }
 
     void wrapTextField(final EditText edit, final String key){
-        mPermissionService.getPermissionManager().addOnPermissionChangeListener(key, new PermissionManager.OnPermissionChangeListener() {
-            @Override
-            public void onPermissionChange(int current) {
-                if((current & PermissionManager.FLAG_WRITE) == PermissionManager.FLAG_WRITE){
-                    linkTextField(edit, key);
-                }else{
-                    unlinkTextField(key);
+
+            mPermissionService.getReference("emails/messages/"+mId+"/"+key).addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
+                @Override
+                public void onPermissionChange(int current) {
+                    if(mOwner.equals(mDeviceId) || current == 0) {
+                        edit.setEnabled(true);
+            edit.setInputType(EditorInfo.TYPE_CLASS_TEXT);
+                        edit.setOnClickListener(null);
+                        edit.setFocusable(true);
+                        edit.setBackgroundColor(Color.TRANSPARENT);
+                    }else if(current == 1){
+//            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
+                        edit.setEnabled(false);
+                        edit.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                sendMessage();
+                            }
+                        });
+                    }else if(current == 2){
+//                        edit.setEnabled(false);
+                        edit.setInputType(InputType.TYPE_NULL);
+                        edit.setFocusable(false);
+                        edit.setBackgroundColor(Color.BLACK);
+                        edit.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                Toast.makeText(ComposeActivity.this, "Requesting permission...",0).show();
+                                try {
+                                    JSONObject args = new JSONObject();
+                                    args.put("deviceId", mDeviceId);
+                                    args.put("messageId", mId);
+                                    args.put("resourceKey", key);
+                                    args.put("description", "Requesting access to " + key);
+                                    mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+                    }
                 }
-            }
 
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
 
-            }
-        });
+                }
+            });
+        linkTextField(edit, key);
     }
 
     void unlinkTextField(String key){
@@ -315,20 +381,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         });
 
 
-        if(canEdit(key) == FLAG_CAN_EDIT) {
-            edit.setEnabled(true);
-//            edit.setInputType(EditorInfo.TYPE_NULL);
-            edit.setOnClickListener(null);
-        }else{
-//            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
-            edit.setEnabled(false);
-            edit.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    sendMessage();
-                }
-            });
-        }
+
 
         edit.addTextChangedListener(new TextWatcher() {
             @Override

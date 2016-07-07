@@ -87,17 +87,17 @@ public class Message implements Parcelable{
     }
 
 
-    public Message getChildInstance(){
-        Message result = new Message();
-        result.id = UUID.randomUUID().toString();
-        result.parent = this.id;
-        result.type = this.type;
-        result.target = this.target;
-        result.source = this.source;
-        result.message = this.message;
-        result.callback = this.callback;
-        return result;
-    }
+//    public Message getChildInstance(){
+//        Message result = new Message();
+//        result.id = UUID.randomUUID().toString();
+//        result.parent = this.id;
+//        result.type = this.type;
+//        result.target = this.target;
+//        result.source = this.source;
+//        result.message = this.message;
+//        result.callback = this.callback;
+//        return result;
+//    }
 
     @Override
     public int describeContents() {

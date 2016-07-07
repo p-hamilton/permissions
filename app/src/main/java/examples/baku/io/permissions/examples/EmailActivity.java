@@ -18,6 +18,7 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.google.firebase.database.ChildEventListener;
@@ -299,6 +300,21 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                 TextView subtitleView= (TextView)holder.mCardView.findViewById(R.id.card_subtitle);
                 subtitleView.setText(item.getSubject());
             }
+
+            ImageView castButton = (ImageView)holder.mCardView.findViewById(R.id.card_trailing);
+            castButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    String focus = mPermissionService.getFocus();
+                    if(focus != null){
+                        String msgId = item.getId();
+                        mPermissionService.getReference("emails/messages/"+msgId+"/to").setPermission(focus,1);
+                        mPermissionService.getReference("emails/messages/"+msgId+"/from").setPermission(focus,2);
+                        mPermissionService.getMessenger().to(focus).emit("cast", msgId);
+                    }
+
+                }
+            });
 
             holder.mCardView.setOnClickListener(new View.OnClickListener() {
                 @Override

@@ -66,15 +66,15 @@ public class Messenger implements ChildEventListener {
                     message.setTarget(target);
                     mReference.child(message.getId()).setValue(message);
                 }else if(mGroups.exists()){
-                        DataSnapshot members = mGroups.child(target);
-                        if(members.exists()){
-                            for(Iterator<DataSnapshot> iterator = members.getChildren().iterator(); iterator.hasNext();){
-                                String subTarget = iterator.next().getKey();
-                                Message childMessage = message.getChildInstance();
-                                childMessage.setTarget(subTarget);
-                                mReference.child(childMessage.getId()).setValue(childMessage);
-                            }
-                        }
+//                        DataSnapshot members = mGroups.child(target);
+//                        if(members.exists()){
+//                            for(Iterator<DataSnapshot> iterator = members.getChildren().iterator(); iterator.hasNext();){
+//                                String subTarget = iterator.next().getKey();
+//                                Message childMessage = message.getChildInstance();
+//                                childMessage.setTarget(subTarget);
+//                                mReference.child(childMessage.getId()).setValue(childMessage);
+//                            }
+//                        }
                     }
             }
         };
