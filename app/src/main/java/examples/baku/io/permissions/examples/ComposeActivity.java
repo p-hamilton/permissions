@@ -303,7 +303,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 public void onPermissionChange(int current) {
                     if(mOwner.equals(mDeviceId) || current == 0) {
                         edit.setEnabled(true);
-            edit.setInputType(EditorInfo.TYPE_CLASS_TEXT);
                         edit.setOnClickListener(null);
                         edit.setFocusable(true);
                         edit.setBackgroundColor(Color.TRANSPARENT);
@@ -318,7 +317,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                         });
                     }else if(current == 2){
 //                        edit.setEnabled(false);
-                        edit.setInputType(InputType.TYPE_NULL);
                         edit.setFocusable(false);
                         edit.setBackgroundColor(Color.BLACK);
                         edit.setOnClickListener(new View.OnClickListener() {

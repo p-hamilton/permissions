@@ -33,7 +33,7 @@ public class PermissionManager {
     static final String KEY_REQUESTS = "_requests";
 
     private String mId;
-    final Map<String, PermissionReference> resources = new HashMap<>();
+    final Map<String, PermissionReference> mResources = new HashMap<>();
 
     final Map<String, PermissionRequest> mRequests = new HashMap<>();
 //    final Map<String, ChildEventListener> mPermissionDatabaseListeners = new HashMap<>();
@@ -59,10 +59,10 @@ public class PermissionManager {
 
 
     PermissionReference getResource(String path){
-        if(!resources.containsKey(path)){
-            resources.put(path, new PermissionReference(path));
+        if(!mResources.containsKey(path)){
+            mResources.put(path, new PermissionReference(path));
         }
-        return resources.get(path);
+        return mResources.get(path);
     }
 
 
@@ -178,19 +178,24 @@ public class PermissionManager {
 
         private void refreshPermissions(){
             if(permissionListeners.size() > 0){
-                int highestPermissions = 0;
-                for (Iterator<String> iterator = permissions.keySet().iterator(); iterator.hasNext(); ) {
-                    String key = iterator.next();
-                    if(!mId.equals(key)){
-                        continue;
+                if(permissions.size() > 0){
+
+                    int highestPermissions = 0;
+                    for (Iterator<String> iterator = permissions.keySet().iterator(); iterator.hasNext(); ) {
+                        String key = iterator.next();
+                        if(!mId.equals(key)){
+                            continue;
+                        }
+                        int perms = permissions.get(key);
+                        highestPermissions |= perms;
                     }
-                    int perms = permissions.get(key);
-                    highestPermissions |= perms;
-                }
-//                if(currentPermissions != highestPermissions){
                     currentPermissions = highestPermissions;
+                }
+                else{
+                    currentPermissions = FLAG_READ | FLAG_WRITE;
+                }
                     for (OnPermissionChangeListener listener : permissionListeners) {
-                        listener.onPermissionChange(highestPermissions);
+                        listener.onPermissionChange(currentPermissions);
                     }
 //                }
             }
