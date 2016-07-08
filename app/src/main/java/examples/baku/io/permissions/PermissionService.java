@@ -18,6 +18,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseException;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONException;
@@ -103,12 +104,11 @@ public class PermissionService extends Service {
 
 
         mFirebaseDB = FirebaseDatabase.getInstance();
-
-        mDevicesReference = mFirebaseDB.getReference("devices");
+        mDevicesReference = mFirebaseDB.getReference("_devices");
         mRequestsReference = mFirebaseDB.getReference("requests");
 
         mPermissionsReference = mFirebaseDB.getReference("permissions");
-        mPermissionManager = new PermissionManager(mFirebaseDB.getReference(), mDeviceId);
+        mPermissionManager = new PermissionManager(mFirebaseDB.getReference("_rules"), mDeviceId);
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         initForegroundNotification();

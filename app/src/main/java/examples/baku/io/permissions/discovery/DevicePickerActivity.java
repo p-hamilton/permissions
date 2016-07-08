@@ -20,13 +20,24 @@ public class DevicePickerActivity extends AppCompatActivity implements EventFrag
     private Map<String, DeviceData> mDevices;
     private DevicePickerActivityFragment mFragment;
 
+    private int requestCode;
+    public static final int REQUEST_FOCUS = -1;
+    public static final int REQUEST_DEVICE_ID = 2;
+    public static final String EXTRA_REQUEST = "requestCode";
+    public static final String EXTRA_DEVICE_ID = "requestCode";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         sendBroadcast(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));  //close notification tray
-
         setContentView(R.layout.content_device_picker);
+
+        Intent intent = getIntent();
+        if(intent != null){
+            requestCode = intent.getIntExtra(EXTRA_REQUEST, REQUEST_FOCUS);
+        }
+
         PermissionService.bind(this);
     }
 
@@ -43,7 +54,13 @@ public class DevicePickerActivity extends AppCompatActivity implements EventFrag
             case DevicePickerActivityFragment.EVENT_ITEMCLICKED:
                 String dId = args.getString(DevicePickerActivityFragment.ARG_DEVICE_ID);
                 if(dId != null){
-                    mPermissionService.setFocus(dId);
+                    if(requestCode == REQUEST_DEVICE_ID){
+                        Intent result = new Intent();
+                        result.putExtra(EXTRA_DEVICE_ID,dId);
+                        setResult(0, result);
+                    }else{
+                        mPermissionService.setFocus(dId);
+                    }
                     finish();
                     return true;
                 }

@@ -1,5 +1,9 @@
 package examples.baku.io.permissions.examples;
 
+import com.google.firebase.database.ServerValue;
+
+import java.util.Map;
+
 /**
  * Created by phamilton on 6/22/16.
  */
@@ -11,6 +15,8 @@ public class MessageData {
     String subject = "";
     String message = "";
     String owner;
+    long timeStamp;
+
 //    Map<String, Map<String, Integer>> shared = new HashMap<>();
 
     public MessageData(){}
@@ -69,5 +75,13 @@ public class MessageData {
 
     public void setOwner(String owner) {
         this.owner = owner;
+    }
+
+    public Map<String,String> getTimeStamp() {
+        return ServerValue.TIMESTAMP;
+    }
+
+    public void setTimeStamp(long timeStamp) {
+        this.timeStamp = timeStamp;
     }
 }
