@@ -20,7 +20,7 @@ public class PermissionTree {
     private int permission;
     private final Map<String, PermissionTree> children = new HashMap<>();
 
-    public PermissionTree(String key, int permissions) {
+    public PermissionTree(String key, int permission) {
         this.key = key;
         this.permission = permission;
     }
@@ -35,6 +35,24 @@ public class PermissionTree {
 
     public void removeChild(String id){
         children.remove(id);
+    }
+
+    public int getPermission(){
+        return permission;
+    }
+
+
+    public int getPermissionAt(String path, int acc){
+        if(path == null){
+            throw new IllegalArgumentException("illegal path value");
+        }
+        acc |= getPermission();
+        String[] pathItems = path.split("/");
+        PermissionTree currentNode = this;
+        for (int i = 0; i < pathItems.length; i++) {
+            if(currentNode.children.containsKey())
+        }
+        return acc;
     }
 
     static PermissionTree fromSnapshot(DataSnapshot snapshot){

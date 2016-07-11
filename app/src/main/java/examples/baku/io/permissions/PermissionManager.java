@@ -38,15 +38,17 @@ public class PermissionManager {
 
     final Map<String, PermissionRequest> mRequests = new HashMap<>();
 //    final Map<String, ChildEventListener> mPermissionDatabaseListeners = new HashMap<>();
-//    final Map<String, Set<OnPermissionChangeListener>> permissionListeners = new HashMap<>();
 //    final Map<String, Set<OnRequestListener>> requestListeners = new HashMap<>();
 //    final Map<String, Set<OnReferralListener>> referralListeners = new HashMap<>();
+
 
     final Map<String, Blessing> mBlessings = new HashMap<>();
     Query mReceivedRef;
     final Set<String> mReceivedBlessings = new HashSet<>();
 
-    final Map<String, ValueEventListener> mPermissionValueEventListeners = new HashMap<>();
+    final Map<String, Integer> mCachedPermission = new HashMap<>();
+
+    final Map<String, Set<OnPermissionChangeListener>> mPermissionValueEventListeners = new HashMap<>();
 
 
     //<targetId, blessingId>
@@ -71,9 +73,9 @@ public class PermissionManager {
         }
         String key = snapshot.getKey();
         if(mBlessings.containsKey(key)){
-            mBlessings.get(key).update(snapshot);
+            mBlessings.get(key).setSnapshot(snapshot);
         }else{
-            mBlessings.put(key, Blessing.fromSnapshot(snapshot));
+            mBlessings.put(key, new Blessing(snapshot));
         }
     }
 
@@ -98,9 +100,8 @@ public class PermissionManager {
     public Blessing bless(String target){
         Blessing result = getGrantedBlessing(target);
         if(result == null){
-            result = new Blessing();
+            result = new Blessing(target, this.mId, mRulesReference);
         }
-
         return result;
     }
 
@@ -131,30 +132,41 @@ public class PermissionManager {
         }
     };
 
-    public void addPermissionEventListener(String path, ValueEventListener listener){
+    public int getPermission(String path){
+        if(mCachedPermission.containsKey(path))
+            return mCachedPermission.get(path);
+        int result = getCombinedPermission(path);
+        mCachedPermission.put(path, result);
+        return result;
+    }
+
+    private int getCombinedPermission(String path){
+        int current = 0;
         for(String bId: mReceivedBlessings){
             Blessing blessing = mBlessings.get(bId);
-            if(blessing.)
+            current = blessing.getPermissionAt(path, current);
         }
+        return current;
     }
 
-    public void setPermission(String path, String group, int permission) {
-        if (group == null) {
-            group = KEY_DEFAULT;
+    public OnPermissionChangeListener addPermissionEventListener(String path, OnPermissionChangeListener listener){
+        int current = getPermission(path);
+        listener.onPermissionChange(current);
+        if(mPermissionValueEventListeners.containsKey(path)){
+            mPermissionValueEventListeners.get(path).add(listener);
+        }else{
+            Set<OnPermissionChangeListener> listeners = new HashSet<OnPermissionChangeListener>();
+            listeners.add(listener);
+            mPermissionValueEventListeners.put(path, listeners);
         }
-        mDatabaseReference.child(path).child(group).setValue(permission);
+        return listener;
     }
 
-
-    PermissionReference getResource(String path) {
-        if (!mResources.containsKey(path)) {
-            mResources.put(path, new PermissionReference(path));
+    public void removePermissionEventListener(String path, OnPermissionChangeListener listener) {
+        if (mPermissionValueEventListeners.containsKey(path)) {
+            mPermissionValueEventListeners.get(path).remove(listener);
         }
-        return mResources.get(path);
     }
-
-
-
 
     public interface OnRequestListener {
         void onRequest(PermissionRequest request);

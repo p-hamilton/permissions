@@ -1,11 +1,13 @@
 package examples.baku.io.permissions;
 
 import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Created by phamilton on 7/9/16.
@@ -16,7 +18,7 @@ public class Blessing {
     static final String KEY_RULES = "_rules";
 
     private String id;
-    private String pattern;
+//    private String pattern;
     private String source;
     private String target;
     private DatabaseReference ref;
@@ -26,13 +28,71 @@ public class Blessing {
     final private Map<String, PermissionReference> refCache = new HashMap<>();
 
 
-    public Blessing(){}
+    public Blessing(DataSnapshot snapshot){
+        setSnapshot(snapshot);
+        this.id = snapshot.child("id").getValue(String.class);
+        this.target = snapshot.child("target").getValue(String.class);
+        if(snapshot.hasChild("source"))
+            this.source = snapshot.child("source").getValue(String.class);
+    }
 
+    public Blessing(String target, String source, DatabaseReference root) {
+        String key = UUID.randomUUID().toString();
+        setRef(root.child(key));
+        setId(key);
+        setSource(source);
+        setTarget(target);
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                setSnapshot(dataSnapshot);
+            }
 
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                databaseError.toException().printStackTrace();
+            }
+        });
+    }
 
     public ValueEventListener addPermissionEventListener(String path, ValueEventListener listener){
         getRef(path).addPermissionValueEventListener(listener);
         return listener;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public String getTarget() {
+        return target;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+        ref.child("id").setValue(id);
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+        ref.child("source").setValue(source);
+    }
+
+    public void setTarget(String target) {
+        this.target = target;
+        ref.child("target").setValue(target);
+    }
+
+    public void setSnapshot(DataSnapshot snapshot) {
+        if(!snapshot.exists()){
+            throw new IllegalArgumentException("empty snapshot");
+        }
+        this.snapshot = snapshot;
+        setRef(snapshot.getRef());
     }
 
     public Blessing setPermissions(String path, int permissions){
@@ -56,24 +116,30 @@ public class Blessing {
         return result;
     }
 
-    public void update(DataSnapshot snapshot){
-
-    }
-
     public void setRef(DatabaseReference ref) {
         this.ref = ref;
         this.rulesRef = ref.child(KEY_RULES);
     }
 
-    static Blessing fromSnapshot(DataSnapshot snapshot){
-        Blessing result = new Blessing();
-        return result;
+    public int getPermissionAt(String path, int starting){
+        if(snapshot == null){   //snapshot not retrieved
+            return starting;
+        }
+        if(path == null){
+            throw new IllegalArgumentException("illegal path value");
+        }
+        String[] pathItems = path.split("/");
+        DataSnapshot currentNode = snapshot;
+        for (int i = 0; i < pathItems.length; i++) {
+            if(currentNode.hasChild(KEY_PERMISSIONS)){
+                starting |= currentNode.child(KEY_PERMISSIONS).getValue(Integer.class);
+            }
+            if(snapshot.hasChild(pathItems[i])){
+                currentNode = snapshot.child(pathItems[i]);
+            }else{  //child doesn't exist
+                break;
+            }
+        }
+        return starting;
     }
-
-    static Blessing fromTemplate(DatabaseReference reference, DataSnapshot snapshot){
-        Blessing result = new Blessing();
-        return result;
-    }
-
-
 }
