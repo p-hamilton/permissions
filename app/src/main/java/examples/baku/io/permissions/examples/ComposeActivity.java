@@ -49,7 +49,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     private PermissionService mPermissionService;
     private DatabaseReference mMessageRef;
     private DatabaseReference mSyncedMessageRef;
-    private PermissionManager.PermissionReference mPermissionRef;
 
     String sourceId;
 
@@ -150,19 +149,15 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 if (dId != null) {
                     String focus = mPermissionService.getFocus();
 
-                    mPermissionService.getReference("emails/messages/" + mId + "/to").setPermission(focus, 1);
-                    mPermissionService.getReference("emails/messages/" + mId + "/from").setPermission(focus, 2);
+                    //set blessing permissions
+                    mPermissionService.getPermissionManager().bless(focus)
+                            .setPermissions("emails/messages/" + mId + "/to", 1)
+                            .setPermissions("emails/messages/" + mId + "/from", 2);
 
+                    //send launch intent
                     mPermissionService.getMessenger().to(focus).emit("cast", mId);
 
-//                    HashMap<String,Integer> rules = new HashMap<>();
-//                    rules.put("message",0);
-//                    rules.put("subject",0);
-//                    mMessageRef.child("shared").child(dId).setValue(rules);
-//
-//                    Message request = new Message("cast");
-//                    request.getArguments().put("messageId", mId);
-//                    mPermissionService.sendRequest(request);
+
                 } else {
                     Intent requestIntent = new Intent(ComposeActivity.this, DevicePickerActivity.class);
                     requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
@@ -221,23 +216,32 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
         if (mPermissionService != null) {
             mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
-            mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
-
-            mPermissionService.addDiscoveryListener(new PermissionService.DiscoveryListener() {
+            mPermissionService.getPermissionManager().addPermissionEventListener("emails/messages/" + mId, new ValueEventListener() {
                 @Override
-                public void onChange(Map<String, DeviceData> devices) {
-
-                }
-
-                @Override
-                public void onDisassociate(String deviceId) {
-                    if (deviceId != null && deviceId.equals(mOwner)) {
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    if(!dataSnapshot.exists()){ //message doesn't exist, create it
+                        mMessageRef.child("id").setValue(mId);
+                    }else{
                         finish();
                     }
                 }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
             });
 
-            mMessageRef.child("id").setValue(mId);
+            wrapTextField(mToLayout, "to");
+            wrapTextField(mFromLayout, "from");
+            wrapTextField(mSubjectLayout, "subject");
+            wrapTextField(mMessageLayout, "message");
+
+
+
+            mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
+
+
 
             mPermissionRef = mPermissionService.getReference("emails/messages/"+mId);
             mPermissionRef.addPermissionValueEventListener(new ValueEventListener() {
@@ -266,10 +270,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 }
             });
 
-            wrapTextField(mToLayout, "to");
-            wrapTextField(mFromLayout, "from");
-            wrapTextField(mSubjectLayout, "subject");
-            wrapTextField(mMessageLayout, "message");
 
 
         }

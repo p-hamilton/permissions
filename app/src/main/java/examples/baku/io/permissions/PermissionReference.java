@@ -35,8 +35,10 @@ public class PermissionReference {
     }
 
     public void setPermission(int permission) {
-        mPermissionReference.child(PermissionManager.KEY_DEFAULT).setValue(0);
         mPermissionReference.setValue(permission);
+    }
+    public void clearPermission() {
+        mPermissionReference.removeValue();
     }
 
     public void removeOnRequestListener(PermissionManager.OnRequestListener requestListener) {
