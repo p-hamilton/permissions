@@ -6,13 +6,15 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Stack;
 import java.util.UUID;
 
 /**
  * Created by phamilton on 7/9/16.
  */
-public class Blessing {
+public class Blessing implements Iterable<Blessing.Rule>{
 
     static final String KEY_PERMISSIONS = "_permissions";
     static final String KEY_RULES = "_rules";
@@ -141,5 +143,71 @@ public class Blessing {
             }
         }
         return starting;
+    }
+
+    @Override
+    public Iterator<Rule> iterator() {
+        if(snapshot == null || !snapshot.hasChild(KEY_RULES)){
+            return null;
+        }
+        final Stack<DataSnapshot> nodeStack = new Stack<>();
+        nodeStack.push(snapshot.child(KEY_RULES));
+
+        final Stack<Rule> inheritanceStack = new Stack<>();
+        inheritanceStack.push(new Rule("",0)); //default rule
+
+        return new Iterator<Rule>() {
+            @Override
+            public boolean hasNext() {
+                return nodeStack.size() > 0;
+            }
+
+            @Override
+            public Rule next() {
+                DataSnapshot node = nodeStack.pop();
+                Rule inheritedRule = inheritanceStack.pop();
+
+                Rule result = new Rule();
+                result.path = inheritedRule.path + node.getKey();
+                result.permissions = inheritedRule.permissions;
+                if(node.hasChild(KEY_PERMISSIONS)){
+                    result.permissions |= node.child(KEY_PERMISSIONS).getValue(Integer.class);
+                }
+                for (Iterator<DataSnapshot> iterator = node.getChildren().iterator(); iterator.hasNext(); ) {
+                    DataSnapshot child =  iterator.next();
+                    if(child.getKey().startsWith("_")){ //ignore keys with '_' prefix
+                        continue;
+                    }
+                    nodeStack.push(child);
+                    inheritanceStack.push(result);
+                }
+                return result;
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    public static class Rule{
+        private String path;
+        private int permissions;
+
+        public Rule(){}
+
+        public Rule(String path, int permissions) {
+            this.path = path;
+            this.permissions = permissions;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public int getPermissions() {
+            return permissions;
+        }
     }
 }
