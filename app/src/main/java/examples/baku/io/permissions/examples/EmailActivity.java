@@ -308,9 +308,9 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                     String focus = mPermissionService.getFocus();
                     if(focus != null){
                         String msgId = item.getId();
-                        mPermissionService.getReference("emails/messages/"+msgId+"/to").setPermission(focus,1);
-                        mPermissionService.getReference("emails/messages/"+msgId+"/from").setPermission(focus,2);
-                        mPermissionService.getMessenger().to(focus).emit("cast", msgId);
+//                        mPermissionService.getPermissionManager().bless(focus)
+//                                .setPermissions("emails/messages/" + mId + "/to", 1)
+//                                .setPermissions("emails/messages/" + mId + "/from", 2);
                     }
 
                 }

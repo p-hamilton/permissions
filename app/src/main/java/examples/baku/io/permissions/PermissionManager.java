@@ -6,6 +6,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,9 +38,9 @@ public class PermissionManager {
     final Map<String, PermissionReference> mResources = new HashMap<>();
 
     final Map<String, PermissionRequest> mRequests = new HashMap<>();
-//    final Map<String, ChildEventListener> mPermissionDatabaseListeners = new HashMap<>();
-//    final Map<String, Set<OnRequestListener>> requestListeners = new HashMap<>();
-//    final Map<String, Set<OnReferralListener>> referralListeners = new HashMap<>();
+
+    final Map<String, Set<OnRequestListener>> requestListeners = new HashMap<>();
+    final Map<String, Set<OnReferralListener>> referralListeners = new HashMap<>();
 
 
     final Map<String, Blessing> mBlessings = new HashMap<>();
@@ -261,6 +262,43 @@ public class PermissionManager {
         }
     }
 
+    public void removeOnRequestListener(PermissionManager.OnRequestListener requestListener) {
+        requestListeners.remove(requestListener);
+    }
+
+    public PermissionManager.OnRequestListener addOnRequestListener(String path, PermissionManager.OnRequestListener requestListener) {
+        if(requestListeners.containsKey(path)){
+            requestListeners.get(path).add(requestListener);
+        }else{
+            Set<OnRequestListener> listeners = new HashSet<>();
+            listeners.add(requestListener);
+            requestListeners.put(path, listeners);
+        }
+        return requestListener;
+    }
+
+    public void removeOnReferralListener(OnReferralListener referralListener) {
+        referralListeners.remove(referralListener);
+    }
+
+    public OnReferralListener addOnReferralListener(String path, OnReferralListener referralListener) {
+        if(referralListeners.containsKey(path)){
+            referralListeners.get(path).add(referralListener);
+        }else{
+            Set<OnReferralListener> listeners = new HashSet<>();
+            listeners.add(referralListener);
+            referralListeners.put(path, listeners);
+        }
+        return referralListener;
+    }
+
+    public boolean refer(PermissionReferral referral) {
+        return false;
+    }
+
+    public boolean request(PermissionRequest request) {
+        return false;
+    }
 
     public interface OnRequestListener {
         void onRequest(PermissionRequest request);
