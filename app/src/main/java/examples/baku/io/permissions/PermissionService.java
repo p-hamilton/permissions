@@ -83,7 +83,6 @@ public class PermissionService extends Service {
         void onDisassociate(String deviceId);
     }
 
-    //TODO: better interface
     public class PermissionServiceBinder extends Binder {
         public PermissionService getInstance() {
             return PermissionService.this;
@@ -114,6 +113,7 @@ public class PermissionService extends Service {
         initForegroundNotification();
 
         registerDevice();
+        initDeviceBlessing();
         initMessenger();
         initDiscovery();
 
@@ -162,13 +162,6 @@ public class PermissionService extends Service {
         return mPermissionManager;
     }
 
-    public PermissionManager.PermissionReference getReference(String path){
-        if(mPermissionManager != null){
-            return mPermissionManager.getResource(path);
-        }
-        return null;
-    }
-
     public String getDeviceId() {
         return mDeviceId;
     }
@@ -213,6 +206,29 @@ public class PermissionService extends Service {
         mNotificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification);
     }
 
+
+    public void initDeviceBlessing(){
+        final DatabaseReference deviceBlessingRef = mFirebaseDB.getReference("_blessings").child(mDeviceId);
+        deviceBlessingRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                Blessing deviceBlessing;
+                if(dataSnapshot.exists()){
+                    deviceBlessing = new Blessing(dataSnapshot);
+                }else{
+                    deviceBlessing = new Blessing(mDeviceId, null, deviceBlessingRef);
+                }
+
+                //give device access to all documents
+                deviceBlessing.setPermissions("documents/"+mDeviceId, PermissionManager.FLAG_WRITE|PermissionManager.FLAG_READ);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+    }
 
     public void initMessenger(){
         mMessengerReference = mFirebaseDB.getReference("messages");

@@ -255,6 +255,10 @@ public class PermissionManager {
         if (mPermissionValueEventListeners.containsKey(path)) {
             mPermissionValueEventListeners.get(path).remove(listener);
         }
+        String nca = getNearestCommonAncestor(path);
+        if(mNearestAncestors.containsKey(nca)){
+            mNearestAncestors.get(nca).remove(path);
+        }
     }
 
 
