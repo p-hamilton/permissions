@@ -13,6 +13,8 @@ import java.util.UUID;
 
 /**
  * Created by phamilton on 7/9/16.
+ *
+ *
  */
 public class Blessing implements Iterable<Blessing.Rule> {
 
@@ -102,7 +104,16 @@ public class Blessing implements Iterable<Blessing.Rule> {
     public Blessing clearPermissions(String path) {
         getRef(path).clearPermission();
         return this;
+    }
 
+    //delete all permission above path
+    public Blessing revoke(String path) {
+        if(path != null){
+            rulesRef.child(path).removeValue();
+        }else{
+            rulesRef.removeValue();
+        }
+        return this;
     }
 
     public PermissionReference getRef(String path) {

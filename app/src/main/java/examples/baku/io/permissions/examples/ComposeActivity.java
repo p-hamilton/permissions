@@ -136,18 +136,15 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
                     //set blessing permissions
                     mPermissionService.getPermissionManager().bless(focus)
-                            .setPermissions(mPath, 3);
-//                            .setPermissions("emails/messages/" + mId + "/to", 1)
-//                            .setPermissions("emails/messages/" + mId + "/from", 2);
+                            .setPermissions(mPath, PermissionManager.FLAG_READ);
 
                     //send launch intent
                     mPermissionService.getMessenger().to(focus).emit("cast", mId);
 
-
                 } else {
                     Intent requestIntent = new Intent(ComposeActivity.this, DevicePickerActivity.class);
                     requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
-                    requestIntent.putExtra(EXTRA_MESSAGE_PATH, mPath);
+                    requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS, mPath);
                     startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
                 }
 
@@ -160,25 +157,11 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         return super.onOptionsItemSelected(item);
     }
 
-    void sendMessage() {
-        if (mOwner != null && mPermissionService != null) {
-            try {
-                JSONObject args = new JSONObject();
-                args.put("deviceId", mDeviceId);
-                args.put("messageId", mId);
-                args.put("resourceKey", "send");
-                args.put("description", "Attempitng to send message");
-                mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
 
-//            Message request = new Message("request");
-//            request.getArguments().put("original", syncTexts.get("message").getOriginal());
-//            request.getArguments().put("messageId", mId);
-//            request.setTarget(mOwner);
-//            mPermissionService.sendRequest(request);
-        }
+    void sendMessage() {
+
+        //TODO: PermissionManager.request()
+
         finish();
     }
 
@@ -189,7 +172,9 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         if (requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data != null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)) {
             String focus = data.getStringExtra(DevicePickerActivity.EXTRA_DEVICE_ID);
             mPermissionService.getPermissionManager().bless(focus)
-                    .setPermissions(mPath, 3);
+                    .setPermissions(mPath, PermissionManager.FLAG_READ)
+                    .setPermissions(mPath + "/message", PermissionManager.FLAG_WRITE)
+                    .setPermissions(mPath + "/subject", PermissionManager.FLAG_WRITE);
             JSONObject castArgs = new JSONObject();
             try {
                 castArgs.put("activity", ComposeActivity.class.getSimpleName());
@@ -216,7 +201,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 if (intent.hasExtra(EXTRA_MESSAGE_PATH)) {
                     mPath = intent.getStringExtra(EXTRA_MESSAGE_PATH);
                     String[] pathElements = mPath.split("/");
-                    mId = pathElements[pathElements.length -1];
+                    mId = pathElements[pathElements.length - 1];
                 } else if (intent.hasExtra(EXTRA_MESSAGE_ID)) {
                     mId = intent.getStringExtra(EXTRA_MESSAGE_ID);
                     mPath = EmailActivity.KEY_DOCUMENTS
@@ -240,56 +225,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             wrapTextField(mSubjectLayout, "subject");
             wrapTextField(mMessageLayout, "message");
 
-//            mPermissionService.getPermissionManager().addPermissionEventListener("emails/messages/" + mId, new ValueEventListener() {
-//                @Override
-//                public void onDataChange(DataSnapshot dataSnapshot) {
-//                    if(!dataSnapshot.exists()){ //message doesn't exist, create it
-//                        mMessageRef.child("id").setValue(mId);
-//                    }else{
-//                        finish();
-//                    }
-//                }
-//
-//                @Override
-//                public void onCancelled(DatabaseError databaseError) {
-//
-//                }
-//            });
-//
-//
-//
-//
-//            mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
-//
-//
-//
-//            mPermissionRef = mPermissionService.getReference("emails/messages/"+mId);
-//            mPermissionRef.addPermissionValueEventListener(new ValueEventListener() {
-//                @Override
-//                public void onDataChange(DataSnapshot dataSnapshot) {
-//                    if(!dataSnapshot.exists()){
-//                        mPermissionRef.setPermission(mDeviceId, PermissionManager.FLAG_READ | PermissionManager.FLAG_READ);
-//                    }
-//                }
-//
-//                @Override
-//                public void onCancelled(DatabaseError databaseError) {
-//
-//                }
-//            });
-//            PermissionManager.PermissionReference messagePermissionRef = mPermissionService.getReference("emails/messages/"+mId);
-//            messagePermissionRef.addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
-//                @Override
-//                public void onPermissionChange(int current) {
-//
-//                }
-//
-//                @Override
-//                public void onCancelled(DatabaseError databaseError) {
-//
-//                }
-//            });
-
+            mPermissionService.setStatus(EXTRA_MESSAGE_PATH, mPath);
 
         }
     }
@@ -309,25 +245,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     };
 
 
-    private DataSnapshot sharingRules;
-
-    public void setSharingRules(DataSnapshot sharingRules) {
-        this.sharingRules = sharingRules;
-    }
-
-    int FLAG_CAN_EDIT = 2 << 1;
-
-    int canEdit(String key) {
-        if (mOwner.equals(mDeviceId)) {
-            return FLAG_CAN_EDIT;
-        } else if (sharingRules != null) {
-            if (sharingRules.hasChild(mDeviceId) && sharingRules.child(mDeviceId).hasChild(key)) {
-                return FLAG_CAN_EDIT;
-            }
-        }
-        return 0;
-    }
-
     @Override
     public void onServiceDisconnected(ComponentName name) {
 
@@ -336,7 +253,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     void wrapTextField(final TextInputLayout editContainer, final String key) {
         final EditText edit = editContainer.getEditText();
 
-        mPermissionService.getPermissionManager().addPermissionEventListener(mPath, new PermissionManager.OnPermissionChangeListener() {
+        mPermissionService.getPermissionManager().addPermissionEventListener(mPath + "/" + key, new PermissionManager.OnPermissionChangeListener() {
             @Override
             public void onPermissionChange(int current) {
                 Log.e(key, "::" + current);
@@ -346,41 +263,18 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                     edit.setFocusable(true);
                     edit.setBackgroundColor(Color.TRANSPARENT);
                     linkTextField(edit, key);
+                } else if ((current & PermissionManager.FLAG_READ) == PermissionManager.FLAG_READ) {
+                    edit.setEnabled(false);
+                    edit.setOnClickListener(null);
+                    edit.setFocusable(false);
+                    edit.setBackgroundColor(Color.TRANSPARENT);
+                    linkTextField(edit, key);
                 } else {
                     unlinkTextField(key);
+                    edit.setEnabled(false);
+                    edit.setFocusable(false);
+                    edit.setBackgroundColor(Color.BLACK);
                 }
-//                if (current == 0) {
-//
-//                } else if (current == 1) {
-////            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
-//                    edit.setEnabled(false);
-//                    edit.setOnClickListener(new View.OnClickListener() {
-//                        @Override
-//                        public void onClick(View v) {
-//                            sendMessage();
-//                        }
-//                    });
-//                } else if (current == (PermissionManager.FLAG_READ | PermissionManager.FLAG_WRITE)) {
-////                        edit.setEnabled(false);
-//                    edit.setFocusable(false);
-//                    edit.setBackgroundColor(Color.BLACK);
-//                    edit.setOnClickListener(new View.OnClickListener() {
-//                        @Override
-//                        public void onClick(View v) {
-//                            Toast.makeText(ComposeActivity.this, "Requesting permission...", 0).show();
-//                            try {
-//                                JSONObject args = new JSONObject();
-//                                args.put("deviceId", mDeviceId);
-//                                args.put("messageId", mId);
-//                                args.put("resourceKey", key);
-//                                args.put("description", "Requesting access to " + key);
-//                                mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
-//                            } catch (JSONException e) {
-//                                e.printStackTrace();
-//                            }
-//                        }
-//                    });
-//                }
             }
 
             @Override
@@ -394,10 +288,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         if (syncTexts.containsKey(key)) {
             syncTexts.get(key).unlink();
         }
-
-//        if(mMessageRef != null && listeners.containsKey(key)){
-//            mMessageRef.child(key).removeEventListener(listeners.get(key));
-//        }
     }
 
     void linkTextField(final EditText edit, final String key) {
@@ -445,6 +335,9 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         unlinkTextField("form");
         unlinkTextField("subject");
         unlinkTextField("message");
+        if (mPermissionService != null) {
+            mPermissionService.revokeAll();
+        }
         unbindService(this);
     }
 }

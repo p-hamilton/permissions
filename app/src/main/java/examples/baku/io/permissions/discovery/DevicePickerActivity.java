@@ -12,6 +12,7 @@ import java.util.Map;
 
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
+import examples.baku.io.permissions.examples.ComposeActivity;
 import examples.baku.io.permissions.util.EventFragment;
 
 public class DevicePickerActivity extends AppCompatActivity implements EventFragment.EventFragmentListener, ServiceConnection {
@@ -25,6 +26,9 @@ public class DevicePickerActivity extends AppCompatActivity implements EventFrag
     public static final int REQUEST_DEVICE_ID = 2;
     public static final String EXTRA_REQUEST = "requestCode";
     public static final String EXTRA_DEVICE_ID = "requestCode";
+    public static final String EXTRA_REQUEST_ARGS = "requestArgs";
+
+    private Intent mIntent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +42,7 @@ public class DevicePickerActivity extends AppCompatActivity implements EventFrag
             requestCode = intent.getIntExtra(EXTRA_REQUEST, REQUEST_FOCUS);
         }
 
+        mIntent = getIntent();
         PermissionService.bind(this);
     }
 
@@ -57,6 +62,10 @@ public class DevicePickerActivity extends AppCompatActivity implements EventFrag
                     if(requestCode == REQUEST_DEVICE_ID){
                         Intent result = new Intent();
                         result.putExtra(EXTRA_DEVICE_ID,dId);
+                        if(mIntent != null && mIntent.hasExtra(EXTRA_REQUEST_ARGS))
+                        {
+                            result.putExtra(EXTRA_REQUEST_ARGS, mIntent.getStringExtra(EXTRA_REQUEST_ARGS));
+                        }
                         setResult(0, result);
                     }else{
                         mPermissionService.setFocus(dId);

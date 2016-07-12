@@ -221,11 +221,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         try {
             MessageData msg = snapshot.getValue(MessageData.class);
             String key = msg.getId();
-            if (isValid(msg)) {
-                mMessages.put(key, msg);
-            } else if (mMessages.containsKey(key)) {    //remove if no longer valid
-                mMessages.remove(key);
-            }
+            mMessages.put(key, msg);
         } catch (DatabaseException e) {
             e.printStackTrace();
         }
@@ -237,17 +233,6 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         }
     }
 
-    //TODO: move this functionality to the server. On client only for demo purposes.
-    boolean isValid(MessageData msg) {
-        return true;
-//        if(mDeviceId.equals(msg.getOwner())){
-//            return true;
-//        }
-////        else if(msg.getShared().containsKey(mDeviceId)){
-////            return true;
-////        }
-//        return false;
-    }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         public CardView mCardView;
@@ -270,8 +255,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data != null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)) {
             String focus = data.getStringExtra(DevicePickerActivity.EXTRA_DEVICE_ID);
-            String path = data.getStringExtra(ComposeActivity.EXTRA_MESSAGE_PATH);
-
+            String path = data.getStringExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS);
 
             mPermissionService.getPermissionManager().bless(focus)
                     .setPermissions(path, 3);
@@ -316,9 +300,6 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
 
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            // - get element from your dataset at this position
-            // - replace the contents of the view with that element
-//            holder.mCardView.setText(mDataset[position]);
 
             final MessageData item = getItem(position);
 
@@ -337,8 +318,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                     String focus = mPermissionService.getFocus();
                     if (focus != null) {
 
-                    }
-                    else{ //choose device
+                    } else { //choose device
                         Intent requestIntent = new Intent(EmailActivity.this, DevicePickerActivity.class);
                         String path = EmailActivity.KEY_DOCUMENTS
                                 + "/" + mDeviceId
@@ -346,7 +326,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                                 + "/" + EmailActivity.KEY_MESSAGES
                                 + "/" + item.getId();
                         requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
-                        requestIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_PATH, path);
+                        requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS, path);
                         startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
                     }
 
@@ -374,7 +354,5 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     protected void onDestroy() {
         super.onDestroy();
         unbindService(this);
-//        mMessagesRef.removeEventListener(messagesValueListener);
-//        mMessagesRef.removeEventListener(messageChildListener);
     }
 }

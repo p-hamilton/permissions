@@ -1,11 +1,10 @@
 package examples.baku.io.permissions;
 
-
 import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,58 +12,58 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+
 /**
  * Created by phamilton on 6/28/16.
  */
 public class PermissionManager {
 
     DatabaseReference mDatabaseRef;
-//    DatabaseReference mRulesReference;
     DatabaseReference mBlessingsRef;
     DatabaseReference mRequestsRef;
 
     public static final int FLAG_DEFAULT = 0;
     public static final int FLAG_WRITE = 1 << 0;
     public static final int FLAG_READ = 1 << 1;
-    public static final int FLAG_REQUEST = 1 << 2;     //2-way
-    public static final int FLAG_REFER = 1 << 3;       //1-way
+    public static final int FLAG_PUSH = 1 << 2;     //2-way
+//    public static final int FLAG_REFER = 1 << 3;       //1-way
 
-//    static final String KEY_RULES = "_rules";
     static final String KEY_PERMISSIONS = "_permissions";
     static final String KEY_REQUESTS = "_requests";
     static final String KEY_BLESSINGS = "_blessings";
 
     private String mId;
-    final Map<String, PermissionReference> mResources = new HashMap<>();
 
     final Map<String, PermissionRequest> mRequests = new HashMap<>();
 
-    final Map<String, Set<OnRequestListener>> requestListeners = new HashMap<>();
+//    final Map<String, Set<OnRequestListener>> requestListeners = new HashMap<>();
+    final Set<OnRequestListener> requestListeners = new HashSet<>();
     final Map<String, Set<OnReferralListener>> referralListeners = new HashMap<>();
 
-
     final Map<String, Blessing> mBlessings = new HashMap<>();
-    Query mReceivedRef;
+    //<targetId, blessingId>
+    //TODO: allow for multiple granted blessings per target
+    final Map<String, Blessing> mGrantedBlessings = new HashMap<>();
 
     final Map<String, Integer> mCachedPermissions = new HashMap<>();
     final Map<String, Set<OnPermissionChangeListener>> mPermissionValueEventListeners = new HashMap<>();
     final Map<String, Set<String>> mNearestAncestors = new HashMap<>();
 
 
-    //<targetId, blessingId>
-    //TODO: allow for multiple granted blessings per target
-    final Map<String, String> mGrantedBlessings = new HashMap<>();
+
 
     //TODO: replace string ownerId with Auth
     public PermissionManager(final DatabaseReference databaseReference, String owner) {
         this.mDatabaseRef = databaseReference;
-//        this.mRulesReference = databaseReference.child(KEY_RULES);
-        this.mRequestsRef = databaseReference.child(KEY_REQUESTS);
         this.mId = owner;
 
+        mRequestsRef = databaseReference.child(KEY_REQUESTS);
+        //TODO: only consider requests from sources within the constelattion
+        mRequestsRef.addChildEventListener(requestListener);
+
         mBlessingsRef = mDatabaseRef.child(KEY_BLESSINGS);
-        mReceivedRef = mBlessingsRef.orderByChild("target").equalTo(mId);
-        mReceivedRef.addChildEventListener(blessingListener);
+        mBlessingsRef.orderByChild("target").equalTo(mId).addChildEventListener(blessingListener);
+        mBlessingsRef.orderByChild("source").equalTo(mId).addListenerForSingleValueEvent(grantedBlessingListener);
     }
 
     void onBlessingUpdated(DataSnapshot snapshot) {
@@ -137,7 +136,7 @@ public class PermissionManager {
             }
         }
 
-        for(String path: changedPermissions){
+         for(String path: changedPermissions){
             onPermissionsChange(path);
         }
 
@@ -158,14 +157,31 @@ public class PermissionManager {
         }
     }
 
+    private ValueEventListener grantedBlessingListener = new ValueEventListener() {
+        @Override
+        public void onDataChange(DataSnapshot dataSnapshot) {
+            if(dataSnapshot.exists()){
+                for(DataSnapshot blessingSnap : dataSnapshot.getChildren()){
+                    Blessing blessing = new Blessing(blessingSnap);
+                    mGrantedBlessings.put(blessing.getId(), blessing);
+                }
+            }
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
+
     void onBlessingRemoved(DataSnapshot snapshot) {
         Blessing removedBlessing = mBlessings.remove(snapshot.getKey());
+        refreshPermissions();
     }
 
     public Blessing getGrantedBlessing(String target) {
         if (mGrantedBlessings.containsKey(target)) {
-            String bId = mGrantedBlessings.get(target);
-            return mBlessings.get(bId);
+            return mGrantedBlessings.get(target);
         }
         return null;
     }
@@ -195,9 +211,62 @@ public class PermissionManager {
         Blessing result = getGrantedBlessing(target);
         if (result == null) {
             result = new Blessing(target, this.mId, mBlessingsRef.push());
+            mGrantedBlessings.put(target, result);
         }
         return result;
     }
+
+    private ChildEventListener requestListener = new ChildEventListener() {
+        @Override
+        public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+            onBlessingUpdated(dataSnapshot);
+        }
+
+        @Override
+        public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+            onBlessingUpdated(dataSnapshot);
+        }
+
+        @Override
+        public void onChildRemoved(DataSnapshot dataSnapshot) {
+            onBlessingRemoved(dataSnapshot);
+        }
+
+        @Override
+        public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
+
+    private void onRequestUpdated(DataSnapshot snapshot){
+        if(!snapshot.exists()) return;
+
+        PermissionRequest request = snapshot.getValue(PermissionRequest.class);
+        if(request != null){
+            mRequests.put(request.getId(), request);
+            //TODO: filter relevant requests
+            for (OnRequestListener listener: requestListeners){
+                listener.onRequest(request);
+            }
+        }
+    }
+
+    //TODO: only notify listeners that returned true when the request was added
+    private void onRequestRemoved(DataSnapshot snapshot){
+        mRequests.remove(snapshot.getKey());
+        PermissionRequest request = snapshot.getValue(PermissionRequest.class);
+        if(request != null){
+            for (OnRequestListener listener: requestListeners){
+                listener.onRequestRemoved(request);
+            }
+        }
+    }
+
 
     private ChildEventListener blessingListener = new ChildEventListener() {
         @Override
@@ -280,14 +349,8 @@ public class PermissionManager {
         requestListeners.remove(requestListener);
     }
 
-    public PermissionManager.OnRequestListener addOnRequestListener(String path, PermissionManager.OnRequestListener requestListener) {
-        if (requestListeners.containsKey(path)) {
-            requestListeners.get(path).add(requestListener);
-        } else {
-            Set<OnRequestListener> listeners = new HashSet<>();
-            listeners.add(requestListener);
-            requestListeners.put(path, listeners);
-        }
+    public PermissionManager.OnRequestListener addOnRequestListener(PermissionManager.OnRequestListener requestListener) {
+        requestListeners.add(requestListener);
         return requestListener;
     }
 
@@ -306,16 +369,21 @@ public class PermissionManager {
         return referralListener;
     }
 
-    public boolean refer(PermissionReferral referral) {
-        return false;
+    public void refer(PermissionReferral referral){
     }
 
-    public boolean request(PermissionRequest request) {
-        return false;
+    public void request(PermissionRequest request) {
+        if(request == null)
+            throw new IllegalArgumentException("null request");
+
+        DatabaseReference requestRef = mRequestsRef.push();
+        request.setId(requestRef.getKey());
+        requestRef.setValue(request);
     }
 
     public interface OnRequestListener {
-        void onRequest(PermissionRequest request);
+        boolean onRequest(PermissionRequest request);
+        void onRequestRemoved(PermissionRequest request);
     }
 
     public interface OnReferralListener {

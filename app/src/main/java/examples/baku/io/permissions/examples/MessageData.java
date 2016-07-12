@@ -14,7 +14,6 @@ public class MessageData {
     String from = "";
     String subject = "";
     String message = "";
-    String owner;
     long timeStamp;
 
 //    Map<String, Map<String, Integer>> shared = new HashMap<>();
@@ -69,13 +68,6 @@ public class MessageData {
         this.message = message != null ? message : "";
     }
 
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
 
     public Map<String,String> getTimeStamp() {
         return ServerValue.TIMESTAMP;

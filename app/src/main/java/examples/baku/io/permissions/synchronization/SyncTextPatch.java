@@ -12,11 +12,6 @@ public class SyncTextPatch{
 
     public SyncTextPatch() {}
 
-//        public SyncTextPatch(int ver, String patch) {
-//            this.ver = ver;
-//            this.patch = patch;
-//        }
-
     public int getVer() {
         return ver;
     }
