@@ -42,6 +42,9 @@ import examples.baku.io.permissions.synchronization.SyncText;
 public class ComposeActivity extends AppCompatActivity implements ServiceConnection {
 
     public final static String EXTRA_MESSAGE_ID = "messageId";
+    public final static String EXTRA_MESSAGE_PATH = "messagePath";
+
+    private String mPath;
 
     private String mOwner;
     private String mDeviceId;
@@ -91,24 +94,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             }
         });
 
-        Intent intent = getIntent();
-        if (intent != null) {
-            if (intent.hasExtra(EXTRA_MESSAGE_ID)) {
-                mId = intent.getStringExtra(EXTRA_MESSAGE_ID);
-            }
-            if (intent.hasExtra("sourceId")) {
-                sourceId = intent.getStringExtra("sourceId");
-            }
-            if (intent.hasExtra("review")) {
-                original = intent.getStringExtra("review");
-                Log.e("asdasdasdsa", original);
-            }
-
-        }
-        if (mId == null) {
-            mId = UUID.randomUUID().toString();
-        }
-
 
         mToText = (EditText) findViewById(R.id.composeTo);
         mToLayout = (TextInputLayout) findViewById(R.id.composeToLayout);
@@ -151,8 +136,9 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
                     //set blessing permissions
                     mPermissionService.getPermissionManager().bless(focus)
-                            .setPermissions("emails/messages/" + mId + "/to", 1)
-                            .setPermissions("emails/messages/" + mId + "/from", 2);
+                            .setPermissions(mPath, 3);
+//                            .setPermissions("emails/messages/" + mId + "/to", 1)
+//                            .setPermissions("emails/messages/" + mId + "/from", 2);
 
                     //send launch intent
                     mPermissionService.getMessenger().to(focus).emit("cast", mId);
@@ -161,6 +147,7 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
                 } else {
                     Intent requestIntent = new Intent(ComposeActivity.this, DevicePickerActivity.class);
                     requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
+                    requestIntent.putExtra(EXTRA_MESSAGE_PATH, mPath);
                     startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
                 }
 
@@ -201,21 +188,58 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data != null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)) {
             String focus = data.getStringExtra(DevicePickerActivity.EXTRA_DEVICE_ID);
-//            mPermissionService.getReference("emails/messages/" + mId + "/to").setPermission(focus, 1);
-//            mPermissionService.getReference("emails/messages/" + mId + "/from").setPermission(focus, 2);
-//            mPermissionService.getMessenger().to(focus).emit("cast", mId);
+            mPermissionService.getPermissionManager().bless(focus)
+                    .setPermissions(mPath, 3);
+            JSONObject castArgs = new JSONObject();
+            try {
+                castArgs.put("activity", ComposeActivity.class.getSimpleName());
+                castArgs.put(EXTRA_MESSAGE_PATH, mPath);
+                mPermissionService.getMessenger().to(focus).emit("cast", castArgs.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         }
     }
+
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
         PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder) service;
         mPermissionService = binder.getInstance();
 
-        mDeviceId = mPermissionService.getDeviceId();
 
         if (mPermissionService != null) {
-            mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
+            mDeviceId = mPermissionService.getDeviceId();
+
+            Intent intent = getIntent();
+            if (intent != null) {
+                if (intent.hasExtra(EXTRA_MESSAGE_PATH)) {
+                    mPath = intent.getStringExtra(EXTRA_MESSAGE_PATH);
+                    String[] pathElements = mPath.split("/");
+                    mId = pathElements[pathElements.length -1];
+                } else if (intent.hasExtra(EXTRA_MESSAGE_ID)) {
+                    mId = intent.getStringExtra(EXTRA_MESSAGE_ID);
+                    mPath = EmailActivity.KEY_DOCUMENTS
+                            + "/" + mDeviceId
+                            + "/" + EmailActivity.KEY_EMAILS
+                            + "/" + EmailActivity.KEY_MESSAGES
+                            + "/" + mId;
+                }
+            }
+
+            if (mPath == null) {
+                mId = UUID.randomUUID().toString();
+                mPath = "documents/" + mDeviceId + "/emails/messages/" + mId;
+            }
+
+            mMessageRef = mPermissionService.getFirebaseDB().getReference(mPath);
+            mSyncedMessageRef = mMessageRef.child("syncedValues");
+            mPermissionService.getPermissionManager().addPermissionEventListener(mPath, messagePermissionListener);
+            wrapTextField(mToLayout, "to");
+            wrapTextField(mFromLayout, "from");
+            wrapTextField(mSubjectLayout, "subject");
+            wrapTextField(mMessageLayout, "message");
+
 //            mPermissionService.getPermissionManager().addPermissionEventListener("emails/messages/" + mId, new ValueEventListener() {
 //                @Override
 //                public void onDataChange(DataSnapshot dataSnapshot) {
@@ -232,10 +256,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 //                }
 //            });
 //
-//            wrapTextField(mToLayout, "to");
-//            wrapTextField(mFromLayout, "from");
-//            wrapTextField(mSubjectLayout, "subject");
-//            wrapTextField(mMessageLayout, "message");
 //
 //
 //
@@ -274,6 +294,20 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
         }
     }
 
+    PermissionManager.OnPermissionChangeListener messagePermissionListener = new PermissionManager.OnPermissionChangeListener() {
+        @Override
+        public void onPermissionChange(int current) {
+            if (current > 0) {
+                mMessageRef.child("id").setValue(mId);
+            }
+        }
+
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+
+        }
+    };
+
 
     private DataSnapshot sharingRules;
 
@@ -302,14 +336,21 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     void wrapTextField(final TextInputLayout editContainer, final String key) {
         final EditText edit = editContainer.getEditText();
 
-//        mPermissionService.getReference("emails/messages/" + mId + "/" + key).addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
-//            @Override
-//            public void onPermissionChange(int current) {
+        mPermissionService.getPermissionManager().addPermissionEventListener(mPath, new PermissionManager.OnPermissionChangeListener() {
+            @Override
+            public void onPermissionChange(int current) {
+                Log.e(key, "::" + current);
+                if ((current & PermissionManager.FLAG_WRITE) == PermissionManager.FLAG_WRITE) {
+                    edit.setEnabled(true);
+                    edit.setOnClickListener(null);
+                    edit.setFocusable(true);
+                    edit.setBackgroundColor(Color.TRANSPARENT);
+                    linkTextField(edit, key);
+                } else {
+                    unlinkTextField(key);
+                }
 //                if (current == 0) {
-//                    edit.setEnabled(true);
-//                    edit.setOnClickListener(null);
-//                    edit.setFocusable(true);
-//                    edit.setBackgroundColor(Color.TRANSPARENT);
+//
 //                } else if (current == 1) {
 ////            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
 //                    edit.setEnabled(false);
@@ -340,13 +381,13 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 //                        }
 //                    });
 //                }
-//            }
-//
-//            @Override
-//            public void onCancelled(DatabaseError databaseError) {
-//
-//            }
-//        });
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
     }
 
     void unlinkTextField(String key) {
@@ -360,8 +401,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     }
 
     void linkTextField(final EditText edit, final String key) {
-
-
         final SyncText syncText = new SyncText(mSyncedMessageRef.child(key), mMessageRef.child(key));
         syncTexts.put(key, syncText);
 
@@ -381,7 +420,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             }
         });
 
-
         edit.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -398,7 +436,6 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
             }
         });
-
     }
 
     @Override

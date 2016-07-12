@@ -55,6 +55,10 @@ public class Blessing implements Iterable<Blessing.Rule> {
         });
     }
 
+    public boolean isSynched(){
+        return snapshot != null;
+    }
+
     public String getId() {
         return id;
     }
@@ -141,7 +145,7 @@ public class Blessing implements Iterable<Blessing.Rule> {
 
     @Override
     public Iterator<Rule> iterator() {
-        if (snapshot == null || !snapshot.hasChild(KEY_RULES)) {
+        if (!isSynched()) {
             return null;
         }
         final Stack<DataSnapshot> nodeStack = new Stack<>();
@@ -150,7 +154,7 @@ public class Blessing implements Iterable<Blessing.Rule> {
         final Stack<Rule> inheritanceStack = new Stack<>();
         inheritanceStack.push(new Rule(null, 0)); //default rule
 
-        return new Iterator<Rule>() {
+        Iterator<Rule> iterator =  new Iterator<Rule>() {
             @Override
             public boolean hasNext() {
                 return nodeStack.size() > 0;
@@ -192,6 +196,8 @@ public class Blessing implements Iterable<Blessing.Rule> {
                 throw new UnsupportedOperationException();
             }
         };
+
+        return iterator;
     }
 
     public static class Rule {

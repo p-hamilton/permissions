@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.ContactsContract;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
@@ -29,6 +30,9 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -36,6 +40,7 @@ import java.util.List;
 
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
+import examples.baku.io.permissions.discovery.DevicePickerActivity;
 
 public class EmailActivity extends AppCompatActivity implements ServiceConnection {
 
@@ -46,8 +51,12 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         Log.e(TAG, msg);
     }   //TODO: real logging
 
+    public static final String KEY_DOCUMENTS = "documents";
+    public static final String KEY_EMAILS = "emails";
+    public static final String KEY_MESSAGES = "messages";
+
     private PermissionService mPermissionService;
-    private String mOwner;
+    private String mDeviceId;
     private FirebaseDatabase mFirebaseDB;
     private DatabaseReference mMessagesRef;
 
@@ -73,6 +82,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                 @Override
                 public void onClick(View view) {
                     startActivity(new Intent(EmailActivity.this, ComposeActivity.class));
+//                    mPermissionService.getDeviceBlessing().setPermissions("documents/" + mDeviceId +"/snake", new Random().nextInt());
 
                 }
             });
@@ -131,8 +141,6 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                 mMessagesRef.child(item.getId()).removeValue();
             }
         }
-
-
     };
 
     @Override
@@ -140,9 +148,9 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder) service;
         mPermissionService = binder.getInstance();
         if (mPermissionService != null) {
-            mOwner = mPermissionService.getDeviceId();
+            mDeviceId = mPermissionService.getDeviceId();
             mFirebaseDB = mPermissionService.getFirebaseDB();
-            mMessagesRef = mFirebaseDB.getReference("documents").child(mOwner).child("email").child("messages");
+            mMessagesRef = mFirebaseDB.getReference(KEY_DOCUMENTS).child(mDeviceId).child(KEY_EMAILS).child(KEY_MESSAGES);
             mMessagesRef.addValueEventListener(messagesValueListener);
             mMessagesRef.addChildEventListener(messageChildListener);
         }
@@ -232,10 +240,10 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     //TODO: move this functionality to the server. On client only for demo purposes.
     boolean isValid(MessageData msg) {
         return true;
-//        if(mOwner.equals(msg.getOwner())){
+//        if(mDeviceId.equals(msg.getOwner())){
 //            return true;
 //        }
-////        else if(msg.getShared().containsKey(mOwner)){
+////        else if(msg.getShared().containsKey(mDeviceId)){
 ////            return true;
 ////        }
 //        return false;
@@ -254,6 +262,27 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
 
                 }
             });
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data != null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)) {
+            String focus = data.getStringExtra(DevicePickerActivity.EXTRA_DEVICE_ID);
+            String path = data.getStringExtra(ComposeActivity.EXTRA_MESSAGE_PATH);
+
+
+            mPermissionService.getPermissionManager().bless(focus)
+                    .setPermissions(path, 3);
+            JSONObject castArgs = new JSONObject();
+            try {
+                castArgs.put("activity", ComposeActivity.class.getSimpleName());
+                castArgs.put(ComposeActivity.EXTRA_MESSAGE_PATH, path);
+                mPermissionService.getMessenger().to(focus).emit("cast", castArgs.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -307,10 +336,18 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
                 public void onClick(View v) {
                     String focus = mPermissionService.getFocus();
                     if (focus != null) {
-                        String msgId = item.getId();
-//                        mPermissionService.getPermissionManager().bless(focus)
-//                                .setPermissions("emails/messages/" + mId + "/to", 1)
-//                                .setPermissions("emails/messages/" + mId + "/from", 2);
+
+                    }
+                    else{ //choose device
+                        Intent requestIntent = new Intent(EmailActivity.this, DevicePickerActivity.class);
+                        String path = EmailActivity.KEY_DOCUMENTS
+                                + "/" + mDeviceId
+                                + "/" + EmailActivity.KEY_EMAILS
+                                + "/" + EmailActivity.KEY_MESSAGES
+                                + "/" + item.getId();
+                        requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
+                        requestIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_PATH, path);
+                        startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
                     }
 
                 }

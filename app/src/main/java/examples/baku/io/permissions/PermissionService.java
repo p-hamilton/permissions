@@ -66,6 +66,7 @@ public class PermissionService extends Service {
 
     DatabaseReference mPermissionsReference;
     PermissionManager mPermissionManager;
+    Blessing mDeviceBlessing;
 
     DatabaseReference mLocalDeviceReference;
 
@@ -235,7 +236,7 @@ public class PermissionService extends Service {
 
             }
         });
-        mPermissionManager.addPermissionEventListener("documents/" + mDeviceId +"/snakes", new PermissionManager.OnPermissionChangeListener() {
+        mPermissionManager.addPermissionEventListener("documents/" + mDeviceId +"/snake", new PermissionManager.OnPermissionChangeListener() {
             @Override
             public void onPermissionChange(int current) {
                 l("sasasa " + current);
@@ -251,15 +252,14 @@ public class PermissionService extends Service {
         deviceBlessingRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                Blessing deviceBlessing;
                 if (dataSnapshot.exists()) {
-                    deviceBlessing = new Blessing(dataSnapshot);
+                    mDeviceBlessing = new Blessing(dataSnapshot);
                 } else {
-                    deviceBlessing = new Blessing(mDeviceId, null, deviceBlessingRef);
+                    mDeviceBlessing = new Blessing(mDeviceId, null, deviceBlessingRef);
                 }
 
                 //give device access its own document directory
-                deviceBlessing.setPermissions("documents/" + mDeviceId, PermissionManager.FLAG_WRITE | PermissionManager.FLAG_READ);
+                mDeviceBlessing.setPermissions("documents/" + mDeviceId, PermissionManager.FLAG_WRITE | PermissionManager.FLAG_READ);
             }
 
             @Override
@@ -267,6 +267,10 @@ public class PermissionService extends Service {
 
             }
         });
+    }
+
+    public Blessing getDeviceBlessing() {
+        return mDeviceBlessing;
     }
 
     public void initMessenger() {
@@ -298,10 +302,22 @@ public class PermissionService extends Service {
         mMessenger.on("cast", new Messenger.Listener() {
             @Override
             public void call(String args, Messenger.Ack callback) {
-                Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
-                emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, args);
-                emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(emailIntent);
+                if(args != null){
+                    try {
+                        JSONObject jsonArgs = new JSONObject(args);
+                        if(jsonArgs.has("activity")){
+                            if(ComposeActivity.class.getSimpleName().equals(jsonArgs.getString("activity"))){
+                                String path = jsonArgs.getString(ComposeActivity.EXTRA_MESSAGE_PATH);
+                                Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
+                                emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_PATH, path);
+                                emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(emailIntent);
+                            }
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
 
@@ -370,7 +386,7 @@ public class PermissionService extends Service {
 //            request.setTarget(tempTarget);
 //        }
 //        request.setSource(mDeviceId);
-//        mRequestsReference.child(request.getId()).setValue(request);
+//        mRequestsRef.child(request.getId()).setValue(request);
 //    }
 
     int notificationIndex = 1111;
