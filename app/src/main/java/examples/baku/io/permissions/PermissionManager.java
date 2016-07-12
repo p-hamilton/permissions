@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.UUID;
 
 /**
  * Created by phamilton on 6/28/16.
@@ -31,8 +32,8 @@ public class PermissionManager {
 
     static final String KEY_RULES = "_rules";
     static final String KEY_PERMISSIONS = "_permissions";
-    static final String KEY_DEFAULT = "_default";
     static final String KEY_REQUESTS = "_requests";
+    static final String KEY_BLESSINGS = "_blessings";
 
     private String mId;
     final Map<String, PermissionReference> mResources = new HashMap<>();
@@ -45,7 +46,6 @@ public class PermissionManager {
 
     final Map<String, Blessing> mBlessings = new HashMap<>();
     Query mReceivedRef;
-    final Set<String> mReceivedBlessings = new HashSet<>();
 
     final Map<String, Integer> mCachedPermissions = new HashMap<>();
     final Map<String, Set<OnPermissionChangeListener>> mPermissionValueEventListeners = new HashMap<>();
@@ -54,7 +54,7 @@ public class PermissionManager {
 
     //<targetId, blessingId>
     //TODO: allow for multiple granted blessings per target
-    final Map<String,String> mGrantedBlessings = new HashMap<>();
+    final Map<String, String> mGrantedBlessings = new HashMap<>();
 
     //TODO: replace string ownerId with Auth
     public PermissionManager(final DatabaseReference databaseReference, String owner) {
@@ -63,49 +63,47 @@ public class PermissionManager {
         this.mRequestsReference = databaseReference.child(KEY_REQUESTS);
         this.mId = owner;
 
-        mReceivedRef = mDatabaseReference.child("_blessings").orderByChild("target").equalTo(mId);
+        mReceivedRef = mDatabaseReference.child(KEY_BLESSINGS).orderByChild("target").equalTo(mId);
         mReceivedRef.addChildEventListener(blessingListener);
-        this.mReceivedRef.addChildEventListener(blessingListener);
     }
 
-    void onBlessingUpdated(DataSnapshot snapshot){
-        if(!snapshot.exists()){
+    void onBlessingUpdated(DataSnapshot snapshot) {
+        if (!snapshot.exists()) {
             throw new IllegalArgumentException("snapshot value doesn't exist");
         }
         String key = snapshot.getKey();
         Blessing blessing = null;
-        if(mBlessings.containsKey(key)){
+        if (mBlessings.containsKey(key)) {
             blessing = mBlessings.get(key);
             blessing.setSnapshot(snapshot);
-        }else{
+        } else {
             blessing = new Blessing(snapshot);
             mBlessings.put(key, blessing);
         }
         refreshPermissions();
     }
 
-    //TODO: optimize. Currently, recalculating entire permission tree
-    void refreshPermissions(){
+    //TODO: optimize this mess. Currently, recalculating entire permission tree.
+    void refreshPermissions() {
         Map<String, Integer> updatedPermissions = new HashMap<>();
-        for(String bId: mReceivedBlessings){
-            Blessing blessing = mBlessings.get(bId);
-            for(Blessing.Rule rule: blessing){
+        for (Blessing blessing : mBlessings.values()) {
+            for (Blessing.Rule rule : blessing) {
                 String path = rule.getPath();
-                if(updatedPermissions.containsKey(path)){
+                if (updatedPermissions.containsKey(path)) {
                     updatedPermissions.put(path, updatedPermissions.get(path) | rule.getPermissions());
-                }else{
+                } else {
                     updatedPermissions.put(path, rule.getPermissions());
                 }
             }
         }
 
         mNearestAncestors.clear();
-        for(String path: mPermissionValueEventListeners.keySet()){
-            String nearestAncestor = getNearestCommonAncestor(path);
-            if(nearestAncestor != null){
-                if(mNearestAncestors.containsKey(nearestAncestor)){
+        for (String path : mPermissionValueEventListeners.keySet()) {
+            String nearestAncestor = getNearestCommonAncestor(path, updatedPermissions.keySet());
+            if (nearestAncestor != null) {
+                if (mNearestAncestors.containsKey(nearestAncestor)) {
                     mNearestAncestors.get(nearestAncestor).add(path);
-                }else{
+                } else {
                     Set<String> descendants = new HashSet<>();
                     descendants.add(path);
                     mNearestAncestors.put(nearestAncestor, descendants);
@@ -113,62 +111,76 @@ public class PermissionManager {
             }
         }
 
+        Set<String> changedPermissions = new HashSet<>();
+
         Set<String> removedPermissions = new HashSet<>(mCachedPermissions.keySet());
         removedPermissions.removeAll(updatedPermissions.keySet());
-        for(String path : removedPermissions){
+        for (String path : removedPermissions) {
             mCachedPermissions.remove(path);
-            onPermissionsChange(path, FLAG_DEFAULT);   //reset to default
+            String newPath = getNearestCommonAncestor(path, updatedPermissions.keySet());
+            changedPermissions.add(newPath);   //reset to default
         }
 
-        for(String path: updatedPermissions.keySet()){
+        for (String path : updatedPermissions.keySet()) {
             int current = updatedPermissions.get(path);
-            if(!mCachedPermissions.containsKey(path)){
+            if (!mCachedPermissions.containsKey(path)) {
                 mCachedPermissions.put(path, current);
-                onPermissionsChange(path, current);
-            }else{
+                changedPermissions.add(path);
+            } else {
                 int previous = mCachedPermissions.get(path);
-                if(previous != current){
+                if (previous != current) {
                     mCachedPermissions.put(path, current);
-                    onPermissionsChange(path, current);
+                    changedPermissions.add(path);
                 }
             }
         }
+
+        for(String path: changedPermissions){
+            onPermissionsChange(path);
+        }
+
+
+
     }
 
     //call all the listeners effected by a permission change at this path
-    void onPermissionsChange(String path, int permissions){
-        if(mNearestAncestors.containsKey(path)){
-            for(String listenerPath: mNearestAncestors.get(path)){
-                if(mPermissionValueEventListeners.containsKey(listenerPath)){
-                    for(OnPermissionChangeListener listener : mPermissionValueEventListeners.get(listenerPath)){
-                        listener.onPermissionChange(permissions);
+    void onPermissionsChange(String path) {
+        if (mNearestAncestors.containsKey(path)) {
+            for (String listenerPath : mNearestAncestors.get(path)) {
+                if (mPermissionValueEventListeners.containsKey(listenerPath)) {
+                    for (OnPermissionChangeListener listener : mPermissionValueEventListeners.get(listenerPath)) {
+                        listener.onPermissionChange(getPermission(path));
                     }
                 }
             }
         }
     }
 
-    void onBlessingRemoved(DataSnapshot snapshot){
+    void onBlessingRemoved(DataSnapshot snapshot) {
         Blessing removedBlessing = mBlessings.remove(snapshot.getKey());
     }
 
-    public Blessing getGrantedBlessing(String target){
-        if(mGrantedBlessings.containsKey(target)){
+    public Blessing getGrantedBlessing(String target) {
+        if (mGrantedBlessings.containsKey(target)) {
             String bId = mGrantedBlessings.get(target);
             return mBlessings.get(bId);
         }
         return null;
     }
 
-    String getNearestCommonAncestor(String path){
+    static String getNearestCommonAncestor(String path, Set<String> ancestors) {
         String[] pathItems = path.split("/");
-        String subpath = "";
+        String subpath = null;
         Stack<String> subpaths = new Stack<>();
-        for(int i = 0; i < pathItems.length - 1; i++){
-            subpath = subpaths.push(subpath + pathItems[i]);
+        for (int i = 0; i < pathItems.length; i++) {
+            if(subpath == null){
+                subpath = subpaths.push(pathItems[i]);
+            }else{
+                subpath = subpaths.push(subpath + "/" + pathItems[i]);
+            }
         }
-        for(String p : subpaths){
-            if(mCachedPermissions.containsKey(p)){
+        for (String p : subpaths) {
+            if (ancestors.contains(p)) {
                 return p;
             }
         }
@@ -176,10 +188,10 @@ public class PermissionManager {
     }
 
     //return a blessing interface for granting/revoking permissions
-    public Blessing bless(String target){
+    public Blessing bless(String target) {
         Blessing result = getGrantedBlessing(target);
-        if(result == null){
-            result = new Blessing(target, this.mId, mRulesReference);
+        if (result == null) {
+            result = new Blessing(target, this.mId, mRulesReference.push());
         }
         return result;
     }
@@ -211,38 +223,37 @@ public class PermissionManager {
         }
     };
 
-    public int getPermission(String path){
-        if(mCachedPermissions.containsKey(path))
+    public int getPermission(String path) {
+        if (mCachedPermissions.containsKey(path))
             return mCachedPermissions.get(path);
         int result = getCombinedPermission(path);
         mCachedPermissions.put(path, result);
         return result;
     }
 
-    private int getCombinedPermission(String path){
+    private int getCombinedPermission(String path) {
         int current = 0;
-        for(String bId: mReceivedBlessings){
-            Blessing blessing = mBlessings.get(bId);
+        for (Blessing blessing : mBlessings.values()) {
             current = blessing.getPermissionAt(path, current);
         }
         return current;
     }
 
-    public OnPermissionChangeListener addPermissionEventListener(String path, OnPermissionChangeListener listener){
+    public OnPermissionChangeListener addPermissionEventListener(String path, OnPermissionChangeListener listener) {
         int current = FLAG_DEFAULT;
-        if(mPermissionValueEventListeners.containsKey(path)){
+        if (mPermissionValueEventListeners.containsKey(path)) {
             mPermissionValueEventListeners.get(path).add(listener);
-        }else{
+        } else {
             Set<OnPermissionChangeListener> listeners = new HashSet<OnPermissionChangeListener>();
             listeners.add(listener);
             mPermissionValueEventListeners.put(path, listeners);
         }
-        String nearestAncestor = getNearestCommonAncestor(path);
-        if(nearestAncestor != null){
+        String nearestAncestor = getNearestCommonAncestor(path, mCachedPermissions.keySet());
+        if (nearestAncestor != null) {
             current = getPermission(nearestAncestor);
-            if(mNearestAncestors.containsKey(nearestAncestor)){
+            if (mNearestAncestors.containsKey(nearestAncestor)) {
                 mNearestAncestors.get(nearestAncestor).add(path);
-            }else{
+            } else {
                 Set<String> descendants = new HashSet<>();
                 descendants.add(path);
                 mNearestAncestors.put(nearestAncestor, descendants);
@@ -256,8 +267,8 @@ public class PermissionManager {
         if (mPermissionValueEventListeners.containsKey(path)) {
             mPermissionValueEventListeners.get(path).remove(listener);
         }
-        String nca = getNearestCommonAncestor(path);
-        if(mNearestAncestors.containsKey(nca)){
+        String nca = getNearestCommonAncestor(path, mCachedPermissions.keySet());
+        if (mNearestAncestors.containsKey(nca)) {
             mNearestAncestors.get(nca).remove(path);
         }
     }
@@ -267,9 +278,9 @@ public class PermissionManager {
     }
 
     public PermissionManager.OnRequestListener addOnRequestListener(String path, PermissionManager.OnRequestListener requestListener) {
-        if(requestListeners.containsKey(path)){
+        if (requestListeners.containsKey(path)) {
             requestListeners.get(path).add(requestListener);
-        }else{
+        } else {
             Set<OnRequestListener> listeners = new HashSet<>();
             listeners.add(requestListener);
             requestListeners.put(path, listeners);
@@ -282,9 +293,9 @@ public class PermissionManager {
     }
 
     public OnReferralListener addOnReferralListener(String path, OnReferralListener referralListener) {
-        if(referralListeners.containsKey(path)){
+        if (referralListeners.containsKey(path)) {
             referralListeners.get(path).add(referralListener);
-        }else{
+        } else {
             Set<OnReferralListener> listeners = new HashSet<>();
             listeners.add(referralListener);
             referralListeners.put(path, listeners);

@@ -14,13 +14,13 @@ import java.util.UUID;
 /**
  * Created by phamilton on 7/9/16.
  */
-public class Blessing implements Iterable<Blessing.Rule>{
+public class Blessing implements Iterable<Blessing.Rule> {
 
     static final String KEY_PERMISSIONS = "_permissions";
-    static final String KEY_RULES = "_rules";
+    static final String KEY_RULES = "rules";
 
     private String id;
-//    private String pattern;
+    //    private String pattern;
     private String source;
     private String target;
     private DatabaseReference ref;
@@ -29,19 +29,17 @@ public class Blessing implements Iterable<Blessing.Rule>{
 
     final private Map<String, PermissionReference> refCache = new HashMap<>();
 
-
-    public Blessing(DataSnapshot snapshot){
+    public Blessing(DataSnapshot snapshot) {
         setSnapshot(snapshot);
         this.id = snapshot.child("id").getValue(String.class);
         this.target = snapshot.child("target").getValue(String.class);
-        if(snapshot.hasChild("source"))
+        if (snapshot.hasChild("source"))
             this.source = snapshot.child("source").getValue(String.class);
     }
 
-    public Blessing(String target, String source, DatabaseReference root) {
-        String key = UUID.randomUUID().toString();
-        setRef(root.child(key));
-        setId(key);
+    public Blessing(String target, String source, DatabaseReference ref) {
+        setRef(ref);
+        setId(ref.getKey());
         setSource(source);
         setTarget(target);
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -55,11 +53,6 @@ public class Blessing implements Iterable<Blessing.Rule>{
                 databaseError.toException().printStackTrace();
             }
         });
-    }
-
-    public ValueEventListener addPermissionEventListener(String path, ValueEventListener listener){
-        getRef(path).addPermissionValueEventListener(listener);
-        return listener;
     }
 
     public String getId() {
@@ -90,28 +83,29 @@ public class Blessing implements Iterable<Blessing.Rule>{
     }
 
     public void setSnapshot(DataSnapshot snapshot) {
-        if(!snapshot.exists()){
+        if (!snapshot.exists()) {
             throw new IllegalArgumentException("empty snapshot");
         }
         this.snapshot = snapshot;
         setRef(snapshot.getRef());
     }
 
-    public Blessing setPermissions(String path, int permissions){
+    public Blessing setPermissions(String path, int permissions) {
         getRef(path).setPermission(permissions);
         return this;
     }
 
-    public Blessing clearPermissions(String path){
+    public Blessing clearPermissions(String path) {
         getRef(path).clearPermission();
         return this;
 
     }
-    public PermissionReference getRef(String path){
+
+    public PermissionReference getRef(String path) {
         PermissionReference result = null;
-        if(refCache.containsKey(path)){
+        if (refCache.containsKey(path)) {
             result = refCache.get(path);
-        }else{
+        } else {
             result = new PermissionReference(rulesRef, path);
             refCache.put(path, result);
         }
@@ -123,22 +117,22 @@ public class Blessing implements Iterable<Blessing.Rule>{
         this.rulesRef = ref.child(KEY_RULES);
     }
 
-    public int getPermissionAt(String path, int starting){
-        if(snapshot == null){   //snapshot not retrieved
+    public int getPermissionAt(String path, int starting) {
+        if (snapshot == null) {   //snapshot not retrieved
             return starting;
         }
-        if(path == null){
+        if (path == null) {
             throw new IllegalArgumentException("illegal path value");
         }
         String[] pathItems = path.split("/");
         DataSnapshot currentNode = snapshot;
         for (int i = 0; i < pathItems.length; i++) {
-            if(currentNode.hasChild(KEY_PERMISSIONS)){
+            if (currentNode.hasChild(KEY_PERMISSIONS)) {
                 starting |= currentNode.child(KEY_PERMISSIONS).getValue(Integer.class);
             }
-            if(snapshot.hasChild(pathItems[i])){
+            if (snapshot.hasChild(pathItems[i])) {
                 currentNode = snapshot.child(pathItems[i]);
-            }else{  //child doesn't exist
+            } else {  //child doesn't exist
                 break;
             }
         }
@@ -147,14 +141,14 @@ public class Blessing implements Iterable<Blessing.Rule>{
 
     @Override
     public Iterator<Rule> iterator() {
-        if(snapshot == null || !snapshot.hasChild(KEY_RULES)){
+        if (snapshot == null || !snapshot.hasChild(KEY_RULES)) {
             return null;
         }
         final Stack<DataSnapshot> nodeStack = new Stack<>();
         nodeStack.push(snapshot.child(KEY_RULES));
 
         final Stack<Rule> inheritanceStack = new Stack<>();
-        inheritanceStack.push(new Rule("",0)); //default rule
+        inheritanceStack.push(new Rule(null, 0)); //default rule
 
         return new Iterator<Rule>() {
             @Override
@@ -168,14 +162,23 @@ public class Blessing implements Iterable<Blessing.Rule>{
                 Rule inheritedRule = inheritanceStack.pop();
 
                 Rule result = new Rule();
-                result.path = inheritedRule.path + node.getKey();
+                String key = node.getKey();
+                if(!KEY_RULES.equals(key)) {   //key_rules is the root directory
+                    if(inheritedRule.path != null){
+                        result.path = inheritedRule.path +"/" + key;
+                    }else{
+                        result.path = key;
+                    }
+                }else{
+                    result.path = null;
+                }
                 result.permissions = inheritedRule.permissions;
-                if(node.hasChild(KEY_PERMISSIONS)){
+                if (node.hasChild(KEY_PERMISSIONS)) {
                     result.permissions |= node.child(KEY_PERMISSIONS).getValue(Integer.class);
                 }
                 for (Iterator<DataSnapshot> iterator = node.getChildren().iterator(); iterator.hasNext(); ) {
-                    DataSnapshot child =  iterator.next();
-                    if(child.getKey().startsWith("_")){ //ignore keys with '_' prefix
+                    DataSnapshot child = iterator.next();
+                    if (child.getKey().startsWith("_")) { //ignore keys with '_' prefix
                         continue;
                     }
                     nodeStack.push(child);
@@ -191,11 +194,12 @@ public class Blessing implements Iterable<Blessing.Rule>{
         };
     }
 
-    public static class Rule{
+    public static class Rule {
         private String path;
         private int permissions;
 
-        public Rule(){}
+        public Rule() {
+        }
 
         public Rule(String path, int permissions) {
             this.path = path;

@@ -199,11 +199,11 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data!= null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)){
+        if (requestCode == DevicePickerActivity.REQUEST_DEVICE_ID && data != null && data.hasExtra(DevicePickerActivity.EXTRA_DEVICE_ID)) {
             String focus = data.getStringExtra(DevicePickerActivity.EXTRA_DEVICE_ID);
-            mPermissionService.getReference("emails/messages/" + mId + "/to").setPermission(focus, 1);
-            mPermissionService.getReference("emails/messages/" + mId + "/from").setPermission(focus, 2);
-            mPermissionService.getMessenger().to(focus).emit("cast", mId);
+//            mPermissionService.getReference("emails/messages/" + mId + "/to").setPermission(focus, 1);
+//            mPermissionService.getReference("emails/messages/" + mId + "/from").setPermission(focus, 2);
+//            mPermissionService.getMessenger().to(focus).emit("cast", mId);
         }
     }
 
@@ -216,60 +216,59 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
 
         if (mPermissionService != null) {
             mMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("messages").child(mId);
-            mPermissionService.getPermissionManager().addPermissionEventListener("emails/messages/" + mId, new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    if(!dataSnapshot.exists()){ //message doesn't exist, create it
-                        mMessageRef.child("id").setValue(mId);
-                    }else{
-                        finish();
-                    }
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
-
-            wrapTextField(mToLayout, "to");
-            wrapTextField(mFromLayout, "from");
-            wrapTextField(mSubjectLayout, "subject");
-            wrapTextField(mMessageLayout, "message");
-
-
-
-            mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
-
-
-
-            mPermissionRef = mPermissionService.getReference("emails/messages/"+mId);
-            mPermissionRef.addPermissionValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    if(!dataSnapshot.exists()){
-                        mPermissionRef.setPermission(mDeviceId, PermissionManager.FLAG_READ | PermissionManager.FLAG_READ);
-                    }
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
-            PermissionManager.PermissionReference messagePermissionRef = mPermissionService.getReference("emails/messages/"+mId);
-            messagePermissionRef.addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
-                @Override
-                public void onPermissionChange(int current) {
-
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-
-                }
-            });
-
+//            mPermissionService.getPermissionManager().addPermissionEventListener("emails/messages/" + mId, new ValueEventListener() {
+//                @Override
+//                public void onDataChange(DataSnapshot dataSnapshot) {
+//                    if(!dataSnapshot.exists()){ //message doesn't exist, create it
+//                        mMessageRef.child("id").setValue(mId);
+//                    }else{
+//                        finish();
+//                    }
+//                }
+//
+//                @Override
+//                public void onCancelled(DatabaseError databaseError) {
+//
+//                }
+//            });
+//
+//            wrapTextField(mToLayout, "to");
+//            wrapTextField(mFromLayout, "from");
+//            wrapTextField(mSubjectLayout, "subject");
+//            wrapTextField(mMessageLayout, "message");
+//
+//
+//
+//            mSyncedMessageRef = mPermissionService.getFirebaseDB().getReference("emails").child("syncedMessages").child(mId);
+//
+//
+//
+//            mPermissionRef = mPermissionService.getReference("emails/messages/"+mId);
+//            mPermissionRef.addPermissionValueEventListener(new ValueEventListener() {
+//                @Override
+//                public void onDataChange(DataSnapshot dataSnapshot) {
+//                    if(!dataSnapshot.exists()){
+//                        mPermissionRef.setPermission(mDeviceId, PermissionManager.FLAG_READ | PermissionManager.FLAG_READ);
+//                    }
+//                }
+//
+//                @Override
+//                public void onCancelled(DatabaseError databaseError) {
+//
+//                }
+//            });
+//            PermissionManager.PermissionReference messagePermissionRef = mPermissionService.getReference("emails/messages/"+mId);
+//            messagePermissionRef.addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
+//                @Override
+//                public void onPermissionChange(int current) {
+//
+//                }
+//
+//                @Override
+//                public void onCancelled(DatabaseError databaseError) {
+//
+//                }
+//            });
 
 
         }
@@ -303,52 +302,51 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
     void wrapTextField(final TextInputLayout editContainer, final String key) {
         final EditText edit = editContainer.getEditText();
 
-        mPermissionService.getReference("emails/messages/" + mId + "/" + key).addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
-            @Override
-            public void onPermissionChange(int current) {
-                if (current == 0) {
-                    edit.setEnabled(true);
-                    edit.setOnClickListener(null);
-                    edit.setFocusable(true);
-                    edit.setBackgroundColor(Color.TRANSPARENT);
-                } else if (current == 1) {
-//            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
-                    edit.setEnabled(false);
-                    edit.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            sendMessage();
-                        }
-                    });
-                } else if (current == (PermissionManager.FLAG_READ | PermissionManager.FLAG_WRITE)) {
-//                        edit.setEnabled(false);
-                    edit.setFocusable(false);
-                    edit.setBackgroundColor(Color.BLACK);
-                    edit.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            Toast.makeText(ComposeActivity.this, "Requesting permission...", 0).show();
-                            try {
-                                JSONObject args = new JSONObject();
-                                args.put("deviceId", mDeviceId);
-                                args.put("messageId", mId);
-                                args.put("resourceKey", key);
-                                args.put("description", "Requesting access to " + key);
-                                mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
-                            } catch (JSONException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    });
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-
-            }
-        });
-//        linkTextField(edit, key);
+//        mPermissionService.getReference("emails/messages/" + mId + "/" + key).addOnPermissionChangeListener(new PermissionManager.OnPermissionChangeListener() {
+//            @Override
+//            public void onPermissionChange(int current) {
+//                if (current == 0) {
+//                    edit.setEnabled(true);
+//                    edit.setOnClickListener(null);
+//                    edit.setFocusable(true);
+//                    edit.setBackgroundColor(Color.TRANSPARENT);
+//                } else if (current == 1) {
+////            edit.setInputType(EditorInfo.TYPE_TEXT_VARIATION_NORMAL);
+//                    edit.setEnabled(false);
+//                    edit.setOnClickListener(new View.OnClickListener() {
+//                        @Override
+//                        public void onClick(View v) {
+//                            sendMessage();
+//                        }
+//                    });
+//                } else if (current == (PermissionManager.FLAG_READ | PermissionManager.FLAG_WRITE)) {
+////                        edit.setEnabled(false);
+//                    edit.setFocusable(false);
+//                    edit.setBackgroundColor(Color.BLACK);
+//                    edit.setOnClickListener(new View.OnClickListener() {
+//                        @Override
+//                        public void onClick(View v) {
+//                            Toast.makeText(ComposeActivity.this, "Requesting permission...", 0).show();
+//                            try {
+//                                JSONObject args = new JSONObject();
+//                                args.put("deviceId", mDeviceId);
+//                                args.put("messageId", mId);
+//                                args.put("resourceKey", key);
+//                                args.put("description", "Requesting access to " + key);
+//                                mPermissionService.getMessenger().to(mOwner).emit("request", args.toString());
+//                            } catch (JSONException e) {
+//                                e.printStackTrace();
+//                            }
+//                        }
+//                    });
+//                }
+//            }
+//
+//            @Override
+//            public void onCancelled(DatabaseError databaseError) {
+//
+//            }
+//        });
     }
 
     void unlinkTextField(String key) {

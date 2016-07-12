@@ -30,8 +30,9 @@ public class PermissionReference {
     public void setPermission(int permission) {
         mPermissionReference.setValue(permission);
     }
+
     public void clearPermission() {
         mPermissionReference.removeValue();
     }
 
-    }
+}

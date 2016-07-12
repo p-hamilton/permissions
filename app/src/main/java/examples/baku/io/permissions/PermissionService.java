@@ -18,7 +18,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseException;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONException;
@@ -39,7 +38,8 @@ import examples.baku.io.permissions.messenger.Message;
 public class PermissionService extends Service {
 
     private static final String TAG = PermissionService.class.getSimpleName();
-    static void l(String msg){
+
+    static void l(String msg) {
         Log.e(TAG, msg);
     }
 
@@ -51,6 +51,8 @@ public class PermissionService extends Service {
 
 
     static final int FOREGROUND_NOTIFICATION_ID = -345;
+
+    static final String KEY_BLESSINGS = PermissionManager.KEY_BLESSINGS;
 
     NotificationManager mNotificationManager;
 
@@ -80,6 +82,7 @@ public class PermissionService extends Service {
 
     public interface DiscoveryListener {
         void onChange(Map<String, DeviceData> devices);
+
         void onDisassociate(String deviceId);
     }
 
@@ -107,7 +110,7 @@ public class PermissionService extends Service {
         mRequestsReference = mFirebaseDB.getReference("requests");
 
         mPermissionsReference = mFirebaseDB.getReference("permissions");
-        mPermissionManager = new PermissionManager(mFirebaseDB.getReference("_rules"), mDeviceId);
+        mPermissionManager = new PermissionManager(mFirebaseDB.getReference(), mDeviceId);
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         initForegroundNotification();
@@ -124,19 +127,20 @@ public class PermissionService extends Service {
         return mMessenger;
     }
 
-    public String getFocus(){
+    public String getFocus() {
         return tempTarget;
     }
 
     static final int FOCUS_NOTIFICATION = 1243254;
-    public void setFocus(String dId){
+
+    public void setFocus(String dId) {
         tempTarget = dId;
-        if(!mDiscovered.containsKey(dId)) return;
+        if (!mDiscovered.containsKey(dId)) return;
 
         DeviceData device = mDiscovered.get(dId);
         String title = device.getName();
         String subtitle = device.getId();   //default
-        if(device.getStatus() != null && device.getStatus().containsKey("description")){
+        if (device.getStatus() != null && device.getStatus().containsKey("description")) {
             subtitle = device.getStatus().get("description");
         }
         int icon = R.drawable.ic_phone_android_black_24dp;
@@ -179,7 +183,7 @@ public class PermissionService extends Service {
         return new PermissionServiceBinder();
     }
 
-    void initForegroundNotification(){
+    void initForegroundNotification() {
 
         Intent contentIntent = new Intent(this, PermissionService.class);
         PendingIntent contentPendingIntent = PendingIntent.getActivity(this, 0, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
@@ -202,25 +206,60 @@ public class PermissionService extends Service {
         startForeground(FOREGROUND_NOTIFICATION_ID, notification);
     }
 
-    void refreshForegroundNotification(Notification notification){
+    void refreshForegroundNotification(Notification notification) {
         mNotificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification);
     }
 
 
-    public void initDeviceBlessing(){
-        final DatabaseReference deviceBlessingRef = mFirebaseDB.getReference("_blessings").child(mDeviceId);
+    public void initDeviceBlessing() {
+
+        mPermissionManager.addPermissionEventListener("documents/" + mDeviceId, new PermissionManager.OnPermissionChangeListener() {
+            @Override
+            public void onPermissionChange(int current) {
+                l("jajaja " + current);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+        mPermissionManager.addPermissionEventListener("documents", new PermissionManager.OnPermissionChangeListener() {
+            @Override
+            public void onPermissionChange(int current) {
+                l("lalala " + current);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+        mPermissionManager.addPermissionEventListener("documents/" + mDeviceId +"/snakes", new PermissionManager.OnPermissionChangeListener() {
+            @Override
+            public void onPermissionChange(int current) {
+                l("sasasa " + current);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        final DatabaseReference deviceBlessingRef = mFirebaseDB.getReference(KEY_BLESSINGS).child(mDeviceId);
         deviceBlessingRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 Blessing deviceBlessing;
-                if(dataSnapshot.exists()){
+                if (dataSnapshot.exists()) {
                     deviceBlessing = new Blessing(dataSnapshot);
-                }else{
+                } else {
                     deviceBlessing = new Blessing(mDeviceId, null, deviceBlessingRef);
                 }
 
-                //give device access to all documents
-                deviceBlessing.setPermissions("documents/"+mDeviceId, PermissionManager.FLAG_WRITE|PermissionManager.FLAG_READ);
+                //give device access its own document directory
+                deviceBlessing.setPermissions("documents/" + mDeviceId, PermissionManager.FLAG_WRITE | PermissionManager.FLAG_READ);
             }
 
             @Override
@@ -230,7 +269,7 @@ public class PermissionService extends Service {
         });
     }
 
-    public void initMessenger(){
+    public void initMessenger() {
         mMessengerReference = mFirebaseDB.getReference("messages");
         mMessenger = new Messenger(mDeviceId, mMessengerReference);
 
@@ -260,7 +299,7 @@ public class PermissionService extends Service {
             @Override
             public void call(String args, Messenger.Ack callback) {
                 Intent emailIntent = new Intent(PermissionService.this, ComposeActivity.class);
-                    emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, args);
+                emailIntent.putExtra(ComposeActivity.EXTRA_MESSAGE_ID, args);
                 emailIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(emailIntent);
             }
@@ -275,12 +314,12 @@ public class PermissionService extends Service {
                     String dId = arguments.getString("deviceId");
                     String messageId = arguments.getString("messageId");
                     String description = arguments.getString("description");
-                    if(!mDiscovered.containsKey(dId)) return;
+                    if (!mDiscovered.containsKey(dId)) return;
 
                     DeviceData device = mDiscovered.get(dId);
                     String title = device.getName();
                     String subtitle = description;   //default
-                    if(device.getStatus() != null && device.getStatus().containsKey("description")){
+                    if (device.getStatus() != null && device.getStatus().containsKey("description")) {
                         subtitle = device.getStatus().get("description");
                     }
 
@@ -296,7 +335,7 @@ public class PermissionService extends Service {
                     PendingIntent dismissPending = PendingIntent.getService(PermissionService.this, 320, dismissIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
 
-                    PendingIntent pi = PendingIntent.getActivity(PermissionService.this ,5, reviewIntent,PendingIntent.FLAG_CANCEL_CURRENT);
+                    PendingIntent pi = PendingIntent.getActivity(PermissionService.this, 5, reviewIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
                     Notification notification = new Notification.Builder(PermissionService.this)
                             .setContentTitle(title)
@@ -306,8 +345,8 @@ public class PermissionService extends Service {
                             .setPriority(Notification.PRIORITY_MAX)
                             .setContentIntent(pi)
                             .setDeleteIntent(dismissPending)
-                            .addAction(new Notification.Action.Builder (R.drawable.ic_check_black_24dp, "Accept", pi).build())
-                            .addAction(new Notification.Action.Builder (R.drawable.ic_close_black_24dp, "Reject", pi).build())
+                            .addAction(new Notification.Action.Builder(R.drawable.ic_check_black_24dp, "Accept", pi).build())
+                            .addAction(new Notification.Action.Builder(R.drawable.ic_close_black_24dp, "Reject", pi).build())
                             .build();
                     mNotificationManager.notify(/*FOCUS_NOTIFICATION*/help++, notification);
                 } catch (JSONException e) {
@@ -319,6 +358,7 @@ public class PermissionService extends Service {
 
 
     }
+
     int help = 123;
 
 //    public void sendRequest(Message request){
@@ -334,38 +374,39 @@ public class PermissionService extends Service {
 //    }
 
     int notificationIndex = 1111;
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if(intent != null && intent.hasExtra("type")){
+        if (intent != null && intent.hasExtra("type")) {
             String type = intent.getStringExtra("type");
-            l("start command "+type);
-            if("sendRequest".equals(type)){
-                if(intent.hasExtra("request")){
+            l("start command " + type);
+            if ("sendRequest".equals(type)) {
+                if (intent.hasExtra("request")) {
                     Message request = intent.getParcelableExtra("request");
 //                    sendRequest(request);
                 }
 
-            }else if("discover".equals(type)){
-                if(mDiscovered != null){
+            } else if ("discover".equals(type)) {
+                if (mDiscovered != null) {
 
                     Intent discoveryIntent = new Intent(this, DevicePickerActivity.class);
                     discoveryIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(discoveryIntent);
                 }
-            }else if("dismiss".equals(type)){
+            } else if ("dismiss".equals(type)) {
                 Message request = new Message("disassociate");
                 request.setTarget(tempTarget);
 //                sendRequest(request);
                 setFocus(null);
 
 
-            }else if("close".equals(type)){
+            } else if ("close".equals(type)) {
                 stopSelf();
-            }else if("focus".equals(type)){
-                if(intent.hasExtra("deviceId")){
+            } else if ("focus".equals(type)) {
+                if (intent.hasExtra("deviceId")) {
                     String dId = intent.getStringExtra("deviceId");
                     l("targetting " + dId);
-                    if(mDiscovered.containsKey(dId)){
+                    if (mDiscovered.containsKey(dId)) {
                         tempTarget = dId;
                         DeviceData target = mDiscovered.get(dId);
 
@@ -395,7 +436,7 @@ public class PermissionService extends Service {
                         refreshForegroundNotification(notification);
 
                     }
-                    for(Iterator<Integer> iterator = mDiscoveredNotifications.values().iterator(); iterator.hasNext();){
+                    for (Iterator<Integer> iterator = mDiscoveredNotifications.values().iterator(); iterator.hasNext(); ) {
                         int notId = iterator.next();
                         mNotificationManager.cancel(notId);
                     }
@@ -406,20 +447,19 @@ public class PermissionService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
-    void registerDevice(){
+    void registerDevice() {
 
         mLocalDeviceReference = mDevicesReference.child(mDeviceId);
         mLocalDeviceReference.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                if(!dataSnapshot.exists()){
+                if (!dataSnapshot.exists()) {
                     resetLocalDevice();
-                }
-                else{
-                    try{
+                } else {
+                    try {
                         mLocalDevice = dataSnapshot.getValue(DeviceData.class);
 
-                    }catch(DatabaseException e){
+                    } catch (DatabaseException e) {
                         e.printStackTrace();
                     }
                 }
@@ -435,14 +475,15 @@ public class PermissionService extends Service {
     }
 
     private DeviceData mLocalDevice;
-    void resetLocalDevice(){
+
+    void resetLocalDevice() {
         final String deviceName = android.os.Build.MODEL;
         mLocalDevice = new DeviceData(mDeviceId, deviceName);
         mLocalDevice.setActive(true);
         mLocalDeviceReference.setValue(mLocalDevice);
     }
 
-    void initDiscovery(){
+    void initDiscovery() {
         mDevicesReference.addChildEventListener(new ChildEventListener() {
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String s) {
@@ -471,24 +512,24 @@ public class PermissionService extends Service {
         });
     }
 
-    public void addDiscoveryListener(DiscoveryListener listener){
+    public void addDiscoveryListener(DiscoveryListener listener) {
         mDiscoveryListener.add(listener);
     }
 
-    private void updateDevice(DataSnapshot dataSnapshot){
-        if(dataSnapshot.exists()){
+    private void updateDevice(DataSnapshot dataSnapshot) {
+        if (dataSnapshot.exists()) {
             String key = dataSnapshot.getKey();
-            if(!mDeviceId.equals(key)){
+            if (!mDeviceId.equals(key)) {
                 try {
                     DeviceData device = dataSnapshot.getValue(DeviceData.class);
                     if (device != null) {
                         mDiscovered.put(key, device);
-                        for (Iterator <DiscoveryListener> iterator = mDiscoveryListener.iterator(); iterator.hasNext(); ) {
-                            DiscoveryListener listener =  iterator.next();
+                        for (Iterator<DiscoveryListener> iterator = mDiscoveryListener.iterator(); iterator.hasNext(); ) {
+                            DiscoveryListener listener = iterator.next();
                             listener.onChange(mDiscovered);
                         }
                     }
-                }catch(DatabaseException e){
+                } catch (DatabaseException e) {
                     e.printStackTrace();
                 }
             }
@@ -496,18 +537,18 @@ public class PermissionService extends Service {
     }
 
 
-    public static void start(Context context){
+    public static void start(Context context) {
         context.startService(new Intent(context, PermissionService.class));
     }
 
     //convenience class for when context implements ServiceConnection
     //throws cast exception
-    public static void bind(Context context){
-        ServiceConnection connection = (ServiceConnection)context;
+    public static void bind(Context context) {
+        ServiceConnection connection = (ServiceConnection) context;
         bind(context, connection);
     }
 
-    public static void bind(Context context, ServiceConnection connection){
+    public static void bind(Context context, ServiceConnection connection) {
         context.bindService(new Intent(context, PermissionService.class), connection, BIND_AUTO_CREATE);
     }
 }

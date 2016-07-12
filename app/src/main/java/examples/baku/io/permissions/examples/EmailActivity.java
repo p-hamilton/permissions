@@ -37,11 +37,12 @@ import java.util.List;
 import examples.baku.io.permissions.PermissionService;
 import examples.baku.io.permissions.R;
 
-public class EmailActivity extends AppCompatActivity implements ServiceConnection{
+public class EmailActivity extends AppCompatActivity implements ServiceConnection {
 
 
     private static final String TAG = PermissionService.class.getSimpleName();
-    static void l(String msg){
+
+    static void l(String msg) {
         Log.e(TAG, msg);
     }   //TODO: real logging
 
@@ -126,23 +127,22 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             //Remove swiped item from list and notify the RecyclerView
             int pos = viewHolder.getAdapterPosition();
             MessageData item = mInboxAdapter.getItem(pos);
-            if(item != null){
+            if (item != null) {
                 mMessagesRef.child(item.getId()).removeValue();
             }
         }
-
 
 
     };
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
-        PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder)service;
+        PermissionService.PermissionServiceBinder binder = (PermissionService.PermissionServiceBinder) service;
         mPermissionService = binder.getInstance();
-        if(mPermissionService != null) {
+        if (mPermissionService != null) {
             mOwner = mPermissionService.getDeviceId();
             mFirebaseDB = mPermissionService.getFirebaseDB();
-            mMessagesRef = mFirebaseDB.getReference("emails").child("messages");
+            mMessagesRef = mFirebaseDB.getReference("documents").child(mOwner).child("email").child("messages");
             mMessagesRef.addValueEventListener(messagesValueListener);
             mMessagesRef.addChildEventListener(messageChildListener);
         }
@@ -152,7 +152,6 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
     public void onServiceDisconnected(ComponentName name) {
 
     }
-
 
 
     private ChildEventListener messageChildListener = new ChildEventListener() {
@@ -198,52 +197,53 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         }
     };
 
-    void onMessagesUpdated(DataSnapshot snapshot){
-        if(snapshot == null) throw new IllegalArgumentException("null snapshot");
+    void onMessagesUpdated(DataSnapshot snapshot) {
+        if (snapshot == null) throw new IllegalArgumentException("null snapshot");
 
         mMessages.clear();
         for (Iterator<DataSnapshot> iterator = snapshot.getChildren().iterator(); iterator.hasNext(); ) {
-            DataSnapshot snap =  iterator.next();
+            DataSnapshot snap = iterator.next();
             onMessageUpdated(snap);
         }
     }
 
-    void onMessageUpdated(DataSnapshot snapshot){
-        if(snapshot == null) throw new IllegalArgumentException("null snapshot");
+    void onMessageUpdated(DataSnapshot snapshot) {
+        if (snapshot == null) throw new IllegalArgumentException("null snapshot");
 
-        try{
+        try {
             MessageData msg = snapshot.getValue(MessageData.class);
             String key = msg.getId();
-            if(isValid(msg)){
+            if (isValid(msg)) {
                 mMessages.put(key, msg);
-            }else if(mMessages.containsKey(key)){    //remove if no longer valid
+            } else if (mMessages.containsKey(key)) {    //remove if no longer valid
                 mMessages.remove(key);
             }
-        }catch (DatabaseException e){
+        } catch (DatabaseException e) {
             e.printStackTrace();
         }
     }
 
-    void onMessageRemoved(String id){
-        if(mMessages.containsKey(id)){
+    void onMessageRemoved(String id) {
+        if (mMessages.containsKey(id)) {
             mMessages.remove(id);
         }
     }
 
     //TODO: move this functionality to the server. On client only for demo purposes.
-    boolean isValid(MessageData msg){
-
-        if(mOwner.equals(msg.getOwner())){
-            return true;
-        }
-//        else if(msg.getShared().containsKey(mOwner)){
+    boolean isValid(MessageData msg) {
+        return true;
+//        if(mOwner.equals(msg.getOwner())){
 //            return true;
 //        }
-        return false;
+////        else if(msg.getShared().containsKey(mOwner)){
+////            return true;
+////        }
+//        return false;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         public CardView mCardView;
+
         public ViewHolder(CardView v) {
             super(v);
             mCardView = v;
@@ -261,7 +261,7 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
         private LinkedHashMap<String, MessageData> mDataset;
 
         public MessagesAdapter(LinkedHashMap<String, MessageData> dataset) {
-            if(dataset == null) throw new IllegalArgumentException("null dataset");
+            if (dataset == null) throw new IllegalArgumentException("null dataset");
             setDataset(dataset);
         }
 
@@ -269,16 +269,16 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             this.mDataset = mDataset;
         }
 
-        public MessageData getItem(int position){
+        public MessageData getItem(int position) {
             List<String> order = new ArrayList<>(mDataset.keySet());
             return mDataset.get(order.get(position));
         }
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent,
-                                                       int viewType) {
+                                             int viewType) {
             // create a new view
-            CardView v = (CardView)LayoutInflater.from(parent.getContext())
+            CardView v = (CardView) LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.inbox_card_item, parent, false);
             // set the view's size, margins, paddings and layout parameters
             ViewHolder vh = new ViewHolder(v);
@@ -294,19 +294,19 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             final MessageData item = getItem(position);
 
             String title = item.getFrom();
-            if(title != null){
-                TextView titleView = (TextView)holder.mCardView.findViewById(R.id.card_title);
+            if (title != null) {
+                TextView titleView = (TextView) holder.mCardView.findViewById(R.id.card_title);
                 titleView.setText(item.getFrom());
-                TextView subtitleView= (TextView)holder.mCardView.findViewById(R.id.card_subtitle);
+                TextView subtitleView = (TextView) holder.mCardView.findViewById(R.id.card_subtitle);
                 subtitleView.setText(item.getSubject());
             }
 
-            ImageView castButton = (ImageView)holder.mCardView.findViewById(R.id.card_trailing);
+            ImageView castButton = (ImageView) holder.mCardView.findViewById(R.id.card_trailing);
             castButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     String focus = mPermissionService.getFocus();
-                    if(focus != null){
+                    if (focus != null) {
                         String msgId = item.getId();
 //                        mPermissionService.getPermissionManager().bless(focus)
 //                                .setPermissions("emails/messages/" + mId + "/to", 1)
