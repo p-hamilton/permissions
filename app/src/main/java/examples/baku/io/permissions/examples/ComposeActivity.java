@@ -130,24 +130,10 @@ public class ComposeActivity extends AppCompatActivity implements ServiceConnect
             sendMessage();
         } else if (id == R.id.action_cast) {
             if (mPermissionService != null) {
-                String dId = mPermissionService.getFocus();
-                if (dId != null) {
-                    String focus = mPermissionService.getFocus();
-
-                    //set blessing permissions
-                    mPermissionService.getPermissionManager().bless(focus)
-                            .setPermissions(mPath, PermissionManager.FLAG_READ);
-
-                    //send launch intent
-                    mPermissionService.getMessenger().to(focus).emit("cast", mId);
-
-                } else {
                     Intent requestIntent = new Intent(ComposeActivity.this, DevicePickerActivity.class);
                     requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
                     requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS, mPath);
                     startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
-                }
-
             }
 
         } else if (id == R.id.action_settings) {

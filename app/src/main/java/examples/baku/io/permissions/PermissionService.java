@@ -49,8 +49,8 @@ public class PermissionService extends Service {
         return mRunning;
     }
 
-
-    static final int FOREGROUND_NOTIFICATION_ID = -345;
+    static final int FOREGROUND_NOTIFICATION_ID = 3278;
+    static final int FOCUS_NOTIFICATION = 43254;
 
     static final String KEY_BLESSINGS = PermissionManager.KEY_BLESSINGS;
 
@@ -75,7 +75,7 @@ public class PermissionService extends Service {
     private IBinder mBinder = new PermissionServiceBinder();
 
 
-    private String tempTarget;
+    private String mFocus;
     private Map<String, DeviceData> mDiscovered = new HashMap<>();
     private Map<String, Integer> mDiscoveredNotifications = new HashMap<>();
 
@@ -146,13 +146,12 @@ public class PermissionService extends Service {
     }
 
     public String getFocus() {
-        return null;// tempTarget;
+        return mFocus;
     }
 
-    static final int FOCUS_NOTIFICATION = 1243254;
 
     public void setFocus(String dId) {
-        tempTarget = dId;
+        mFocus = dId;
         if (!mDiscovered.containsKey(dId)) return;
 
         DeviceData device = mDiscovered.get(dId);
@@ -327,7 +326,7 @@ public class PermissionService extends Service {
                 }
             } else if ("dismiss".equals(type)) {
                 Message request = new Message("disassociate");
-                request.setTarget(tempTarget);
+                request.setTarget(mFocus);
 //                sendRequest(request);
                 setFocus(null);
 
@@ -339,7 +338,7 @@ public class PermissionService extends Service {
                     String dId = intent.getStringExtra("deviceId");
                     l("targetting " + dId);
                     if (mDiscovered.containsKey(dId)) {
-                        tempTarget = dId;
+                        mFocus = dId;
                         DeviceData target = mDiscovered.get(dId);
 
                         String title = "Targetting device: " + target.getName();

@@ -315,21 +315,16 @@ public class EmailActivity extends AppCompatActivity implements ServiceConnectio
             castButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    String focus = mPermissionService.getFocus();
-                    if (focus != null) {
-
-                    } else { //choose device
-                        Intent requestIntent = new Intent(EmailActivity.this, DevicePickerActivity.class);
-                        String path = EmailActivity.KEY_DOCUMENTS
-                                + "/" + mDeviceId
-                                + "/" + EmailActivity.KEY_EMAILS
-                                + "/" + EmailActivity.KEY_MESSAGES
-                                + "/" + item.getId();
-                        requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
-                        requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS, path);
-                        startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
-                    }
-
+                    //choose device
+                    Intent requestIntent = new Intent(EmailActivity.this, DevicePickerActivity.class);
+                    String path = EmailActivity.KEY_DOCUMENTS
+                            + "/" + mDeviceId
+                            + "/" + EmailActivity.KEY_EMAILS
+                            + "/" + EmailActivity.KEY_MESSAGES
+                            + "/" + item.getId();
+                    requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST, DevicePickerActivity.REQUEST_DEVICE_ID);
+                    requestIntent.putExtra(DevicePickerActivity.EXTRA_REQUEST_ARGS, path);
+                    startActivityForResult(requestIntent, DevicePickerActivity.REQUEST_DEVICE_ID);
                 }
             });
 
